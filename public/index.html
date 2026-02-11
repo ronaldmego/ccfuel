@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Token Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f0f14;
+      color: #e4e4e7;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(15,15,20,0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      font-size: 1.5em;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #a78bfa, #7c3aed);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .cycle-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #a1a1aa;
+      font-size: 0.875em;
+    }
+
+    .cycle-selector select {
+      background: transparent;
+      border: none;
+      color: #e4e4e7;
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .cycle-selector option {
+      background: #1f1f28;
+    }
+
+    .refresh-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-weight: 600;
+      font-size: 0.875em;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .refresh-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74,222,128,0.3);
+    }
+
+    /* Main Content */
+    .main {
+      padding: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Page Title */
+    .page-title {
+      margin-bottom: 8px;
+    }
+
+    .page-title h1 {
+      font-size: 1.5em;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .page-subtitle {
+      color: #71717a;
+      font-size: 0.875em;
+      margin-bottom: 24px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      width: fit-content;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      color: #71717a;
+      font-family: inherit;
+      font-size: 0.875em;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      color: #a1a1aa;
+    }
+
+    .tab.active {
+      background: rgba(255,255,255,0.08);
+      color: #e4e4e7;
+    }
+
+    .tab-icon {
+      font-size: 1.1em;
+    }
+
+    /* Tab Content */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Stats Grid - Fixed 4 columns */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1200px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Stat Card */
+    .stat-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--accent-color, #4ade80);
+      opacity: 0.8;
+    }
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25em;
+      margin-bottom: 12px;
+      background: var(--icon-bg, rgba(74,222,128,0.15));
+    }
+
+    .stat-value {
+      font-size: 2em;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      color: #71717a;
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-sub {
+      color: #52525b;
+      font-size: 0.8em;
+    }
+
+    .stat-change {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 0.75em;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .stat-change.up {
+      background: rgba(74,222,128,0.15);
+      color: #4ade80;
+    }
+
+    .stat-change.down {
+      background: rgba(248,113,113,0.15);
+      color: #f87171;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      margin-top: 12px;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .progress-fill.green { background: linear-gradient(90deg, #4ade80, #22d3ee); }
+    .progress-fill.yellow { background: linear-gradient(90deg, #fbbf24, #f97316); }
+    .progress-fill.red { background: linear-gradient(90deg, #f87171, #ef4444); }
+
+    /* Color variants */
+    .green { color: #4ade80; }
+    .yellow { color: #fbbf24; }
+    .red { color: #f87171; }
+    .purple { color: #a78bfa; }
+    .cyan { color: #22d3ee; }
+
+    /* Charts Grid - Fixed 2 columns, same height */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+
+    .chart-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .chart-title {
+      font-size: 0.95em;
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 0.75em;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #71717a;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    /* Fixed chart wrapper height for alignment */
+    .chart-wrapper {
+      height: 280px;
+      position: relative;
+    }
+
+    .chart-wrapper canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Global Usage Card (Source of Truth) */
+    .global-usage-card {
+      background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(167,139,250,0.05));
+      border: 1px solid rgba(167,139,250,0.3);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .global-usage-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .global-usage-title {
+      font-size: 1em;
+      font-weight: 600;
+      color: #a78bfa;
+    }
+
+    .global-refresh-btn {
+      background: rgba(167,139,250,0.2);
+      border: 1px solid rgba(167,139,250,0.3);
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+
+    .global-refresh-btn:hover {
+      background: rgba(167,139,250,0.3);
+    }
+
+    .global-refresh-btn.loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .global-usage-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 800px) {
+      .global-usage-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 500px) {
+      .global-usage-grid { grid-template-columns: 1fr; }
+    }
+
+    .global-usage-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .global-usage-item.extra {
+      justify-content: center;
+      align-items: center;
+    }
+
+    .global-usage-label {
+      font-size: 0.75em;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .global-usage-bar {
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .global-usage-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80, #22d3ee);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .global-usage-fill.sonnet {
+      background: linear-gradient(90deg, #a78bfa, #7c3aed);
+    }
+
+    .global-usage-value {
+      font-size: 1.25em;
+      font-weight: 700;
+      color: #e4e4e7;
+    }
+
+    .global-usage-footer {
+      margin-top: 12px;
+      font-size: 0.75em;
+      color: #52525b;
+      text-align: right;
+    }
+
+    /* Weekly Pace Indicator */
+    .pace-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .pace-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .pace-title {
+      font-size: 0.75em;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .pace-status {
+      font-size: 0.8em;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+
+    .pace-status.on-track {
+      background: rgba(74,222,128,0.15);
+      color: #4ade80;
+    }
+
+    .pace-status.accelerated {
+      background: rgba(251,191,36,0.15);
+      color: #fbbf24;
+    }
+
+    .pace-status.critical {
+      background: rgba(248,113,113,0.15);
+      color: #f87171;
+    }
+
+    .pace-bar-container {
+      position: relative;
+      height: 24px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .pace-bar-fill {
+      height: 100%;
+      border-radius: 12px;
+      transition: width 0.5s ease;
+    }
+
+    .pace-bar-ideal {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #e4e4e7;
+      z-index: 2;
+    }
+
+    .pace-bar-ideal::after {
+      content: attr(data-label);
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65em;
+      color: #a1a1aa;
+      white-space: nowrap;
+    }
+
+    .pace-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8em;
+      color: #71717a;
+    }
+
+    .pace-details strong {
+      color: #e4e4e7;
+    }
+
+    /* Cycle Summary (compact row in header area) */
+    .cycle-summary {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .cycle-summary { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 500px) {
+      .cycle-summary { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .cycle-item {
+      text-align: center;
+      padding: 8px;
+    }
+
+    .cycle-item-value {
+      font-size: 1.25em;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .cycle-item-label {
+      font-size: 0.7em;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Gaps List */
+    .gaps-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .gaps-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .gaps-title {
+      font-size: 0.95em;
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+
+    .gaps-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 0.8em;
+    }
+
+    .gaps-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .gaps-list {
+      list-style: none;
+    }
+
+    .gaps-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: rgba(248,113,113,0.05);
+      border-left: 3px solid #f87171;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 8px;
+      font-size: 0.875em;
+    }
+
+    .gaps-list li.success {
+      background: rgba(74,222,128,0.05);
+      border-left-color: #4ade80;
+    }
+
+    .gap-icon {
+      font-size: 1.1em;
+    }
+
+    .gap-duration {
+      font-weight: 600;
+      color: #f87171;
+      min-width: 60px;
+    }
+
+    .gap-time {
+      color: #71717a;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 16px;
+      color: #52525b;
+      font-size: 0.8em;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <div class="logo-icon">📊</div>
+        <span>Token Dashboard</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="cycle-selector">
+        <span>📅</span>
+        <select id="cycle-select">
+          <option value="current">Ciclo Actual</option>
+        </select>
+        <span id="cycle-range" style="margin-left: 8px; color: #e4e4e7;">—</span>
+      </div>
+      <button class="refresh-btn" onclick="refresh()">
+        <span>🔄</span>
+        <span>Actualizar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="page-title">
+      <h1>📊 Token Dashboard</h1>
+    </div>
+    <p class="page-subtitle">Control de stock de tokens Claude</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">
+        <span class="tab-icon">📈</span>
+        <span>Overview</span>
+      </button>
+      <button class="tab" data-tab="gaps">
+        <span class="tab-icon">⚠️</span>
+        <span>Gaps</span>
+      </button>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div class="tab-content active" id="tab-overview">
+      <!-- Global Usage (Source of Truth) -->
+      <div class="global-usage-card" id="global-usage-section">
+        <div class="global-usage-header">
+          <span class="global-usage-title">🎯 Uso Global (Fuente de Verdad)</span>
+          <button class="global-refresh-btn" onclick="refreshGlobalUsage()" id="global-refresh-btn">
+            <span>🔄</span>
+          </button>
+        </div>
+        <div class="global-usage-grid">
+          <div class="global-usage-item">
+            <div class="global-usage-label">Sesion Actual</div>
+            <div class="global-usage-bar">
+              <div class="global-usage-fill" id="global-session-bar" style="width: 0%"></div>
+            </div>
+            <div class="global-usage-value" id="global-session">—%</div>
+          </div>
+          <div class="global-usage-item">
+            <div class="global-usage-label">Semana (Todos)</div>
+            <div class="global-usage-bar">
+              <div class="global-usage-fill" id="global-week-bar" style="width: 0%"></div>
+            </div>
+            <div class="global-usage-value" id="global-week">—%</div>
+          </div>
+          <div class="global-usage-item">
+            <div class="global-usage-label">Semana (Sonnet)</div>
+            <div class="global-usage-bar">
+              <div class="global-usage-fill sonnet" id="global-sonnet-bar" style="width: 0%"></div>
+            </div>
+            <div class="global-usage-value" id="global-sonnet">—%</div>
+          </div>
+          <div class="global-usage-item extra">
+            <div class="global-usage-label">Extra Usage</div>
+            <div class="global-usage-value" id="global-extra">—</div>
+          </div>
+        </div>
+
+        <!-- Weekly Pace Indicator -->
+        <div class="pace-section" id="pace-section">
+          <div class="pace-header">
+            <span class="pace-title">Pace Semanal</span>
+            <span class="pace-status" id="pace-status">—</span>
+          </div>
+          <div class="pace-bar-container">
+            <div class="pace-bar-fill" id="pace-bar-fill" style="width: 0%; background: linear-gradient(90deg, #4ade80, #22d3ee);"></div>
+            <div class="pace-bar-ideal" id="pace-bar-ideal" style="left: 0%;" data-label=""></div>
+          </div>
+          <div class="pace-details">
+            <span id="pace-day-info">—</span>
+            <span id="pace-projection">—</span>
+          </div>
+        </div>
+
+        <div class="global-usage-footer" id="global-usage-footer">
+          <span id="global-usage-status">Cargando...</span>
+        </div>
+      </div>
+
+      <!-- Cycle Summary Row (ccusage) -->
+      <div class="cycle-summary">
+        <div class="cycle-item">
+          <div class="cycle-item-value" id="cycle-days-left">—</div>
+          <div class="cycle-item-label">Dias Restantes</div>
+        </div>
+        <div class="cycle-item">
+          <div class="cycle-item-value" id="cycle-tokens">—</div>
+          <div class="cycle-item-label">Tokens Ciclo</div>
+        </div>
+        <div class="cycle-item">
+          <div class="cycle-item-value" id="cycle-cost">—</div>
+          <div class="cycle-item-label">Costo Equiv.</div>
+        </div>
+        <div class="cycle-item">
+          <div class="cycle-item-value yellow" id="cycle-gaps">—</div>
+          <div class="cycle-item-label">Gaps</div>
+        </div>
+        <div class="cycle-item">
+          <div class="cycle-item-value green" id="cycle-efficiency">—</div>
+          <div class="cycle-item-label">Eficiencia</div>
+        </div>
+        <div class="cycle-item">
+          <div class="cycle-item-value" id="cycle-pace">—</div>
+          <div class="cycle-item-label">Pace</div>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card" style="--accent-color: #4ade80; --icon-bg: rgba(74,222,128,0.15);">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-label">Sesion Actual</div>
+          <div class="stat-value green" id="window-status">—</div>
+          <div class="stat-sub" id="window-time"></div>
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-fill green" id="window-progress" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="--accent-color: #22d3ee; --icon-bg: rgba(34,211,238,0.15);">
+          <div class="stat-icon">📊</div>
+          <div class="stat-label">Tokens Usados</div>
+          <div class="stat-value cyan" id="tokens-used">—</div>
+          <div class="stat-sub" id="tokens-remaining"></div>
+        </div>
+
+        <div class="stat-card" style="--accent-color: #a78bfa; --icon-bg: rgba(167,139,250,0.15);">
+          <div class="stat-icon">💰</div>
+          <div class="stat-label">Costo Equivalente</div>
+          <div class="stat-value purple" id="cost-current">—</div>
+          <div class="stat-sub" id="cost-projected"></div>
+        </div>
+
+        <div class="stat-card" style="--accent-color: #f97316; --icon-bg: rgba(249,115,22,0.15);">
+          <div class="stat-icon">🔥</div>
+          <div class="stat-label">Burn Rate</div>
+          <div class="stat-value" style="color: #f97316;" id="burn-rate">—</div>
+          <div class="stat-sub" id="burn-projection"></div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">📈 Uso Diario Total (14 dias)</span>
+            <div class="chart-legend" id="daily-chart-legend">
+              <span class="legend-item">
+                <span class="legend-dot" style="background: #4ade80;"></span>
+                VPS
+              </span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="dailyChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">🕐 Consumo por Franja Horaria</span>
+            <div class="chart-legend" id="hourly-chart-legend">
+              <span class="legend-item">
+                <span class="legend-dot" style="background: #4ade80;"></span>
+                VPS
+              </span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="hourlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Gaps -->
+    <div class="tab-content" id="tab-gaps">
+      <!-- Daily Summary -->
+      <div class="gaps-card" style="margin-bottom: 16px;">
+        <div class="gaps-header">
+          <span class="gaps-title">📅 Resumen Diario (Horas y Tokens Perdidos)</span>
+        </div>
+        <div id="daily-gaps-summary" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 320px;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <th style="text-align: left; padding: 8px 4px; color: #71717a;">Fecha</th>
+                <th style="text-align: right; padding: 8px 4px; color: #71717a;">Horas</th>
+                <th style="text-align: right; padding: 8px 4px; color: #71717a;">Tokens</th>
+                <th style="text-align: right; padding: 8px 4px; color: #71717a;">USD</th>
+              </tr>
+            </thead>
+            <tbody id="daily-gaps-table">
+              <tr><td colspan="4" style="padding: 12px; text-align: center; color: #52525b;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Individual Gaps -->
+      <div class="gaps-card">
+        <div class="gaps-header">
+          <span class="gaps-title">⚠️ Gaps Individuales</span>
+          <div class="gaps-stats" id="gaps-stats">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+        <ul class="gaps-list" id="gaps-list">
+          <li>Cargando...</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      Ultima actualizacion: <span id="last-update">—</span>
+    </footer>
+  </main>
+
+  <script>
+    let dailyChart = null;
+    let hourlyChart = null;
+    let externalData = null; // { sources: { laptop: { blocks, daily, lastUpdate } } }
+
+    const PANAMA_OFFSET = -5;
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    function formatNumber(n) {
+      if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function formatDuration(minutes) {
+      const h = Math.floor(minutes / 60);
+      const m = Math.round(minutes % 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function getBillingCycleDates() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const day = now.getDate();
+
+      let cycleStart, cycleEnd;
+
+      if (day >= 2) {
+        cycleStart = new Date(year, month, 2);
+        cycleEnd = new Date(year, month + 1, 2);
+      } else {
+        cycleStart = new Date(year, month - 1, 2);
+        cycleEnd = new Date(year, month, 2);
+      }
+
+      const daysLeft = Math.ceil((cycleEnd - now) / (1000 * 60 * 60 * 24));
+      const totalDays = Math.ceil((cycleEnd - cycleStart) / (1000 * 60 * 60 * 24));
+
+      return { cycleStart, cycleEnd, daysLeft, totalDays };
+    }
+
+    function isInCurrentCycle(dateStr) {
+      const { cycleStart, cycleEnd } = getBillingCycleDates();
+      const date = new Date(dateStr);
+      return date >= cycleStart && date < cycleEnd;
+    }
+
+    function analyzeBillingCycle(blocks) {
+      const { cycleStart, cycleEnd, daysLeft, totalDays } = getBillingCycleDates();
+
+      const cycleBlocks = blocks.filter(b => isInCurrentCycle(b.startTime));
+      const activeBlocks = cycleBlocks.filter(b => !b.isGap);
+      const gapBlocks = cycleBlocks.filter(b => b.isGap);
+
+      const cycleTokens = activeBlocks.reduce((sum, b) => sum + b.totalTokens, 0);
+      const cycleCost = activeBlocks.reduce((sum, b) => sum + b.costUSD, 0);
+      const cycleGapHours = gapBlocks.reduce((sum, b) => {
+        return sum + (new Date(b.endTime) - new Date(b.startTime)) / 3600000;
+      }, 0);
+
+      const elapsedDays = totalDays - daysLeft;
+      const possibleHours = elapsedDays * 24;
+      const activeHours = activeBlocks.reduce((sum, b) => {
+        const duration = (new Date(b.actualEndTime || b.endTime) - new Date(b.startTime)) / 3600000;
+        return sum + Math.min(duration, 5);
+      }, 0);
+
+      const efficiency = possibleHours > 0 ? Math.min(100, (activeHours / possibleHours) * 100) : 0;
+
+      return { cycleStart, cycleEnd, daysLeft, cycleTokens, cycleCost, cycleGapHours, gapCount: gapBlocks.length, efficiency };
+    }
+
+    function getLocalHour(utcDateStr) {
+      const d = new Date(utcDateStr);
+      const utcHour = d.getUTCHours();
+      let localHour = utcHour + PANAMA_OFFSET;
+      if (localHour < 0) localHour += 24;
+      return localHour;
+    }
+
+    // Aggregate tokens by hour of day (0-23) for hourly chart
+    function aggregateByHour(blocks) {
+      const byHour = new Array(24).fill(0);
+
+      blocks.filter(b => !b.isGap && isInCurrentCycle(b.startTime)).forEach(block => {
+        const hour = getLocalHour(block.startTime);
+        byHour[hour] += block.totalTokens;
+      });
+
+      return byHour;
+    }
+
+    async function loadExternalData() {
+      try {
+        const res = await fetch('/api/external-usage');
+        const data = await res.json();
+        externalData = data.sources && Object.keys(data.sources).length > 0 ? data : null;
+      } catch (e) {
+        console.error('Error loading external data:', e);
+        externalData = null;
+      }
+    }
+
+    // Merge external daily data into a map { date: totalTokens }
+    function getExternalDailyMap() {
+      const map = {};
+      if (!externalData?.sources) return map;
+      for (const src of Object.values(externalData.sources)) {
+        if (!src.daily?.daily) continue;
+        for (const d of src.daily.daily) {
+          map[d.date] = (map[d.date] || 0) + d.totalTokens;
+        }
+      }
+      return map;
+    }
+
+    // Get all external blocks combined
+    function getExternalBlocks() {
+      const allBlocks = [];
+      if (!externalData?.sources) return allBlocks;
+      for (const src of Object.values(externalData.sources)) {
+        if (!src.blocks?.blocks) continue;
+        allBlocks.push(...src.blocks.blocks);
+      }
+      return allBlocks;
+    }
+
+    // Get external cycle tokens and cost
+    function getExternalCycleStats() {
+      const extBlocks = getExternalBlocks();
+      const cycleBlocks = extBlocks.filter(b => !b.isGap && isInCurrentCycle(b.startTime));
+      const tokens = cycleBlocks.reduce((sum, b) => sum + (b.totalTokens || 0), 0);
+      const cost = cycleBlocks.reduce((sum, b) => sum + (b.costUSD || 0), 0);
+      return { tokens, cost };
+    }
+
+    async function loadData() {
+      try {
+        const [res] = await Promise.all([fetch('/api/data'), loadExternalData()]);
+        const data = await res.json();
+
+        if (!data.blocks?.blocks || !data.daily?.daily) {
+          document.getElementById('window-status').textContent = 'Sin datos';
+          return;
+        }
+
+        const blocks = data.blocks.blocks;
+        const activeBlock = blocks.find(b => b.isActive);
+        const gaps = blocks.filter(b => b.isGap && b.totalTokens === 0);
+
+        // Window status (session % and reset come from loadGlobalUsage)
+        if (activeBlock) {
+
+          document.getElementById('tokens-used').textContent = formatNumber(activeBlock.totalTokens);
+          document.getElementById('tokens-remaining').textContent = `~${formatNumber(50000000 - activeBlock.totalTokens)} disponibles`;
+
+          document.getElementById('cost-current').textContent = '$' + activeBlock.costUSD.toFixed(2);
+          document.getElementById('cost-projected').textContent = `Proyectado: $${activeBlock.projection?.totalCost?.toFixed(2) || '—'}`;
+
+          if (activeBlock.burnRate) {
+            document.getElementById('burn-rate').textContent = formatNumber(activeBlock.burnRate.tokensPerMinute) + '/min';
+            document.getElementById('burn-projection').textContent = `$${activeBlock.burnRate.costPerHour.toFixed(2)}/hora`;
+          }
+        }
+
+        // Cycle stats
+        const cycleStats = analyzeBillingCycle(blocks);
+        const startStr = cycleStats.cycleStart.toLocaleDateString('es-PA', { month: 'short', day: 'numeric' });
+        const endStr = cycleStats.cycleEnd.toLocaleDateString('es-PA', { month: 'short', day: 'numeric' });
+        document.getElementById('cycle-range').textContent = `${startStr} → ${endStr}`;
+        document.getElementById('cycle-days-left').textContent = `${cycleStats.daysLeft}d`;
+        const extStats = getExternalCycleStats();
+        const totalCycleTokens = cycleStats.cycleTokens + extStats.tokens;
+        const totalCycleCost = cycleStats.cycleCost + extStats.cost;
+        const hasExternal = extStats.tokens > 0;
+
+        document.getElementById('cycle-tokens').innerHTML = formatNumber(totalCycleTokens) +
+          (hasExternal ? ` <span style="font-size:0.6em;color:#71717a">(VPS ${formatNumber(cycleStats.cycleTokens)} + Ext ${formatNumber(extStats.tokens)})</span>` : '');
+        document.getElementById('cycle-cost').innerHTML = `$${totalCycleCost.toFixed(0)}` +
+          (hasExternal ? ` <span style="font-size:0.6em;color:#71717a">($${cycleStats.cycleCost.toFixed(0)}+$${extStats.cost.toFixed(0)})</span>` : '');
+        document.getElementById('cycle-gaps').textContent = `${cycleStats.gapCount}`;
+        document.getElementById('cycle-efficiency').textContent = `${cycleStats.efficiency.toFixed(0)}%`;
+
+        // Gaps
+        const totalGapHours = gaps.reduce((sum, g) => sum + (new Date(g.endTime) - new Date(g.startTime)) / 3600000, 0);
+
+        document.getElementById('gaps-stats').innerHTML = `
+          <span class="gaps-stat"><span class="red">${gaps.length}</span> gaps</span>
+          <span class="gaps-stat"><span class="yellow">${totalGapHours.toFixed(0)}h</span> total</span>
+          <span class="gaps-stat">~<span>$${(totalGapHours * 2).toFixed(0)}</span> valor</span>
+        `;
+
+        // Daily gaps summary (cap at 24h per day)
+        const TOKENS_PER_HOUR = 500000;
+        const TOKEN_TO_USD = 0.0000007;
+        const dailyGaps = {};
+
+        gaps.forEach(g => {
+          const gapStart = new Date(g.startTime);
+          const gapEnd = new Date(g.endTime);
+
+          let current = new Date(gapStart);
+          current.setHours(0, 0, 0, 0);
+
+          while (current < gapEnd) {
+            const dayKey = current.toISOString().split('T')[0];
+            const dayStart = new Date(current);
+            const dayEnd = new Date(current);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const effectiveStart = gapStart > dayStart ? gapStart : dayStart;
+            const effectiveEnd = gapEnd < dayEnd ? gapEnd : dayEnd;
+            const hoursThisDay = Math.max(0, (effectiveEnd - effectiveStart) / 3600000);
+
+            if (!dailyGaps[dayKey]) dailyGaps[dayKey] = 0;
+            dailyGaps[dayKey] += hoursThisDay;
+
+            current.setDate(current.getDate() + 1);
+          }
+        });
+
+        const dailyGapsTable = document.getElementById('daily-gaps-table');
+        const sortedDays = Object.keys(dailyGaps).sort().reverse().slice(0, 14);
+
+        if (sortedDays.length > 0) {
+          dailyGapsTable.innerHTML = sortedDays.map(day => {
+            const rawHours = dailyGaps[day];
+            const cappedHours = Math.min(rawHours, 24);
+            const tokensLost = Math.round(cappedHours * TOKENS_PER_HOUR);
+            const valueLost = tokensLost * TOKEN_TO_USD;
+            const barColor = cappedHours > 12 ? '#f87171' : cappedHours > 6 ? '#fbbf24' : '#4ade80';
+
+            return `
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 8px 4px; white-space: nowrap;">${day.slice(5)}</td>
+                <td style="padding: 8px 4px; text-align: right;">
+                  <span style="color: ${barColor}; font-weight: 600;">${cappedHours.toFixed(1)}h</span>
+                </td>
+                <td style="padding: 8px 4px; text-align: right; color: #a78bfa;">${formatNumber(tokensLost)}</td>
+                <td style="padding: 8px 4px; text-align: right; color: #f87171; white-space: nowrap;">$${valueLost.toFixed(0)}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          dailyGapsTable.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #4ade80;">Sin gaps recientes</td></tr>';
+        }
+
+        const gapsList = document.getElementById('gaps-list');
+        if (gaps.length > 0) {
+          gapsList.innerHTML = gaps.slice(-8).reverse().map(g => {
+            const start = new Date(g.startTime).toLocaleString('es-PA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const end = new Date(g.endTime).toLocaleString('es-PA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const hours = ((new Date(g.endTime) - new Date(g.startTime)) / 3600000).toFixed(1);
+            const spansMultipleDays = hours > 24;
+            return `<li><span class="gap-icon">${spansMultipleDays ? '📅' : '🕐'}</span><span class="gap-duration">${hours}h</span><span class="gap-time">${start} → ${end}${spansMultipleDays ? ' (multi-dia)' : ''}</span></li>`;
+          }).join('');
+        } else {
+          gapsList.innerHTML = '<li class="success"><span class="gap-icon">✅</span>No hay gaps recientes</li>';
+        }
+
+        // Charts
+        const dailyData = data.daily.daily.slice(-14);
+        const hourlyData = aggregateByHour(blocks);
+        const extDailyMap = getExternalDailyMap();
+        const extHourlyData = aggregateByHour(getExternalBlocks());
+
+        updateDailyChart(dailyData, extDailyMap);
+        updateHourlyChart(hourlyData, extHourlyData);
+
+        document.getElementById('last-update').textContent = new Date(data.lastUpdate).toLocaleString('es-PA');
+
+      } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('window-status').textContent = 'Error';
+      }
+    }
+
+    const chartOptions = (maxY) => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          min: 0,
+          max: maxY,
+          ticks: { color: '#52525b', font: { size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        x: {
+          ticks: { color: '#52525b', font: { size: 11 } },
+          grid: { display: false }
+        }
+      }
+    });
+
+    function updateDailyChart(dailyData, extDailyMap) {
+      const ctx = document.getElementById('dailyChart').getContext('2d');
+      const labels = dailyData.map(d => d.date.slice(5));
+      const vpsTokens = dailyData.map(d => d.totalTokens / 1000000);
+      const extTokens = dailyData.map(d => (extDailyMap[d.date] || 0) / 1000000);
+      const hasExt = extTokens.some(v => v > 0);
+
+      const maxY = Math.ceil(Math.max(...vpsTokens.map((v, i) => v + extTokens[i]), 1) * 1.1);
+
+      // Update legend
+      const legendEl = document.getElementById('daily-chart-legend');
+      if (hasExt) {
+        legendEl.innerHTML = `
+          <span class="legend-item"><span class="legend-dot" style="background: #4ade80;"></span>VPS</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #22d3ee;"></span>Laptop</span>
+        `;
+      }
+
+      if (dailyChart) dailyChart.destroy();
+
+      const datasets = [{
+        label: 'VPS',
+        data: vpsTokens,
+        backgroundColor: 'rgba(74,222,128,0.6)',
+        borderColor: '#4ade80',
+        borderWidth: 1,
+        borderRadius: 4
+      }];
+
+      if (hasExt) {
+        datasets.push({
+          label: 'Laptop',
+          data: extTokens,
+          backgroundColor: 'rgba(34,211,238,0.6)',
+          borderColor: '#22d3ee',
+          borderWidth: 1,
+          borderRadius: 4
+        });
+      }
+
+      dailyChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+          ...chartOptions(maxY),
+          scales: {
+            ...chartOptions(maxY).scales,
+            x: { ...chartOptions(maxY).scales.x, stacked: true },
+            y: { ...chartOptions(maxY).scales.y, stacked: true }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function updateHourlyChart(hourlyData, extHourlyData) {
+      const ctx = document.getElementById('hourlyChart').getContext('2d');
+      const labels = Array.from({length: 24}, (_, i) => `${String(i).padStart(2, '0')}h`);
+      const vpsM = hourlyData.map(t => t / 1000000);
+      const extM = extHourlyData.map(t => t / 1000000);
+      const hasExt = extM.some(v => v > 0);
+      const maxVal = Math.max(...vpsM.map((v, i) => v + extM[i]), 0.1);
+
+      // Update legend
+      const legendEl = document.getElementById('hourly-chart-legend');
+      if (hasExt) {
+        legendEl.innerHTML = `
+          <span class="legend-item"><span class="legend-dot" style="background: #4ade80;"></span>VPS</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #22d3ee;"></span>Laptop</span>
+        `;
+      }
+
+      if (hourlyChart) hourlyChart.destroy();
+
+      const datasets = [{
+        label: 'VPS',
+        data: vpsM,
+        backgroundColor: 'rgba(74,222,128,0.7)',
+        borderRadius: 3
+      }];
+
+      if (hasExt) {
+        datasets.push({
+          label: 'Laptop',
+          data: extM,
+          backgroundColor: 'rgba(34,211,238,0.7)',
+          borderRadius: 3
+        });
+      }
+
+      hourlyChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}M tokens`
+              }
+            }
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: Math.ceil(maxVal * 1.1) || 1,
+              stacked: true,
+              ticks: {
+                color: '#52525b',
+                font: { size: 11 },
+                callback: (v) => v.toFixed(1) + 'M'
+              },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            },
+            x: {
+              stacked: true,
+              ticks: { color: '#52525b', font: { size: 10 }, maxRotation: 0 },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    async function refresh() {
+      document.getElementById('window-status').textContent = '...';
+      await fetch('/api/refresh');
+      await loadData();
+    }
+
+    // Weekly pace calculation
+    function getWeekDayNumber() {
+      // Claude resets weekly on a specific day. We use a simple Mon=1..Sun=7 model
+      const now = new Date();
+      const day = now.getDay(); // 0=Sun, 1=Mon...6=Sat
+      return day === 0 ? 7 : day;
+    }
+
+    function updatePace(weekAllPercent) {
+      const dayNum = getWeekDayNumber();
+      const idealPercent = Math.round((dayNum / 7) * 100);
+      const realPercent = weekAllPercent;
+
+      // Determine status
+      let status, statusClass, barColor;
+      const ratio = realPercent / Math.max(idealPercent, 1);
+
+      if (ratio <= 1.15) {
+        status = 'On track';
+        statusClass = 'on-track';
+        barColor = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+      } else if (ratio <= 1.5) {
+        status = 'Acelerado';
+        statusClass = 'accelerated';
+        barColor = 'linear-gradient(90deg, #fbbf24, #f97316)';
+      } else {
+        status = 'Critico';
+        statusClass = 'critical';
+        barColor = 'linear-gradient(90deg, #f87171, #ef4444)';
+      }
+
+      // Update UI
+      const statusEl = document.getElementById('pace-status');
+      statusEl.textContent = status;
+      statusEl.className = 'pace-status ' + statusClass;
+
+      const barFill = document.getElementById('pace-bar-fill');
+      barFill.style.width = Math.min(realPercent, 100) + '%';
+      barFill.style.background = barColor;
+
+      const idealMarker = document.getElementById('pace-bar-ideal');
+      idealMarker.style.left = idealPercent + '%';
+      idealMarker.setAttribute('data-label', `Ideal ${idealPercent}%`);
+
+      document.getElementById('pace-day-info').innerHTML = `Dia <strong>${dayNum}/7</strong> — Ideal: <strong>${idealPercent}%</strong> — Real: <strong>${realPercent}%</strong>`;
+
+      // Depletion projection
+      const daysRemaining = 7 - dayNum;
+      const ratePerDay = dayNum > 0 ? realPercent / dayNum : 0;
+      const projected = realPercent + (ratePerDay * daysRemaining);
+
+      if (projected > 100) {
+        const daysUntilDepletion = (100 - realPercent) / Math.max(ratePerDay, 0.01);
+        const depletionDay = Math.ceil(dayNum + daysUntilDepletion);
+        const dayNames = ['', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+        const depletionLabel = depletionDay <= 7 ? dayNames[depletionDay] : 'post-reset';
+        document.getElementById('pace-projection').innerHTML = `Se agota el <strong style="color:#f87171">${depletionLabel}</strong> (proy. ${Math.round(projected)}%)`;
+      } else {
+        document.getElementById('pace-projection').innerHTML = `Llegas al reset con <strong style="color:#4ade80">${Math.round(100 - projected)}%</strong> de margen`;
+      }
+
+      // Update cycle-pace in summary row
+      const paceEl = document.getElementById('cycle-pace');
+      paceEl.textContent = status;
+      paceEl.className = 'cycle-item-value ' + (statusClass === 'on-track' ? 'green' : statusClass === 'accelerated' ? 'yellow' : 'red');
+    }
+
+    // Update session card with real data from /usage
+    function updateSessionCard(session) {
+      const percent = session.percent;
+      const resetsAtHour = session.resetsAtHour;
+
+      document.getElementById('window-status').textContent = percent + '%';
+      document.getElementById('window-status').className = 'stat-value ' +
+        (percent > 80 ? 'red' : percent > 50 ? 'yellow' : 'green');
+
+      const progressBar = document.getElementById('window-progress');
+      progressBar.style.width = percent + '%';
+      progressBar.className = 'progress-fill';
+      if (percent > 80) progressBar.classList.add('red');
+      else if (percent > 50) progressBar.classList.add('yellow');
+      else progressBar.classList.add('green');
+
+      if (resetsAtHour !== null && resetsAtHour !== undefined) {
+        const now = new Date();
+        // Build reset Date in Panama time (UTC-5)
+        const utcNow = now.getTime();
+        const panamaOffset = -5 * 60 * 60 * 1000;
+        const panamaMs = utcNow + panamaOffset;
+        const panamaDate = new Date(panamaMs);
+        const panamaHour = panamaDate.getUTCHours();
+
+        // Calculate hours until reset
+        let hoursUntil = resetsAtHour - panamaHour;
+        if (hoursUntil <= 0) hoursUntil += 24;
+
+        const resetLabel = resetsAtHour > 12 ? (resetsAtHour - 12) + 'pm' :
+                          resetsAtHour === 12 ? '12pm' :
+                          resetsAtHour === 0 ? '12am' : resetsAtHour + 'am';
+
+        const h = Math.floor(hoursUntil);
+        const m = Math.round((hoursUntil - h) * 60);
+        document.getElementById('window-time').textContent =
+          `Reset ${resetLabel} (${h}h ${m}m)`;
+      } else {
+        document.getElementById('window-time').textContent = 'Reset time no disponible';
+      }
+    }
+
+    // Global Usage (Source of Truth)
+    async function loadGlobalUsage() {
+      try {
+        const statusEl = document.getElementById('global-usage-status');
+        statusEl.textContent = 'Cargando...';
+
+        const res = await fetch('/api/global-usage');
+        const data = await res.json();
+
+        if (data.success) {
+          // Update values
+          document.getElementById('global-session').textContent = data.session.percent + '%';
+          document.getElementById('global-week').textContent = data.weekAll.percent + '%';
+          document.getElementById('global-sonnet').textContent = data.weekSonnet.percent + '%';
+
+          // Update bars
+          document.getElementById('global-session-bar').style.width = data.session.percent + '%';
+          document.getElementById('global-week-bar').style.width = data.weekAll.percent + '%';
+          document.getElementById('global-sonnet-bar').style.width = data.weekSonnet.percent + '%';
+
+          // Color bars based on usage
+          const weekBar = document.getElementById('global-week-bar');
+          if (data.weekAll.percent > 80) {
+            weekBar.style.background = 'linear-gradient(90deg, #f87171, #ef4444)';
+          } else if (data.weekAll.percent > 50) {
+            weekBar.style.background = 'linear-gradient(90deg, #fbbf24, #f97316)';
+          }
+
+          // Extra usage
+          if (data.extraUsage.enabled) {
+            document.getElementById('global-extra').innerHTML = '<span style="color:#4ade80">Enabled</span>';
+          } else if (data.extraUsage.freeAvailable > 0) {
+            document.getElementById('global-extra').innerHTML = `<span style="color:#fbbf24">$${data.extraUsage.freeAvailable} free</span>`;
+          } else {
+            document.getElementById('global-extra').textContent = 'No disponible';
+          }
+
+          // Status
+          const cacheNote = data.cached ? ` (cache ${data.cacheAge}m)` : ' (fresh)';
+          statusEl.textContent = 'Actualizado: ' + new Date(data.timestamp).toLocaleTimeString('es-PA') + cacheNote;
+
+          // Update session card with real reset time
+          updateSessionCard(data.session);
+
+          // Update weekly pace
+          updatePace(data.weekAll.percent);
+        } else {
+          document.getElementById('global-usage-status').textContent = 'Error: ' + (data.error || 'Unknown');
+        }
+      } catch (e) {
+        console.error('Error loading global usage:', e);
+        document.getElementById('global-usage-status').textContent = 'Error de conexion';
+      }
+    }
+
+    async function refreshGlobalUsage() {
+      const btn = document.getElementById('global-refresh-btn');
+      btn.classList.add('loading');
+      btn.innerHTML = '⏳';
+
+      try {
+        await fetch('/api/global-usage/refresh');
+        await loadGlobalUsage();
+      } finally {
+        btn.classList.remove('loading');
+        btn.innerHTML = '<span>🔄</span>';
+      }
+    }
+
+    loadData();
+    loadGlobalUsage();
+    setInterval(loadData, 2 * 60 * 1000);
+    setInterval(loadGlobalUsage, 5 * 60 * 1000);
+  </script>
+</body>
+</html>
