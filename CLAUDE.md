@@ -92,8 +92,12 @@ token-dashboard/
 ├── claude-usage.js     # PTY wrapper para Claude /usage
 ├── public/
 │   └── index.html      # Dashboard (todo inline: HTML, CSS, JS)
-├── data/               # Datos legacy (backup, no conectados)
+├── scripts/
+│   └── push-usage.sh   # Sync laptop → VPS (hook + cron)
+├── data/
+│   └── external/       # Datos externos (laptop.json, etc)
 ├── CLAUDE.md           # Este archivo
+├── LOCALSETUP.md       # Setup laptop: hooks, Task Scheduler, sync
 ├── LIMITATIONS.md      # Limitaciones conocidas (IMPORTANTE)
 └── package.json
 ```
@@ -200,7 +204,7 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 
 **LEER:** `LIMITATIONS.md`
 
-ccusage solo ve logs locales de este VPS. No captura uso desde laptop, Claude.ai web, ni API calls directas. Los "gaps" pueden ser falsos si se uso Claude desde otra fuente.
+ccusage solo ve logs JSONL locales. El VPS captura sus propios logs y la laptop sincroniza los suyos via `push-usage.sh` (ver `LOCALSETUP.md`). No captura: Claude.ai web ni API calls directas. Los "gaps" pueden ser falsos si se uso Claude desde otra fuente no integrada.
 
 ---
 
@@ -209,6 +213,7 @@ ccusage solo ve logs locales de este VPS. No captura uso desde laptop, Claude.ai
 | Necesidad | Recurso |
 |-----------|---------|
 | Limitaciones | `LIMITATIONS.md` (en este directorio) |
+| Setup Laptop | `LOCALSETUP.md` (sync laptop → VPS, hooks, Task Scheduler) |
 | ccusage docs | https://github.com/ryoppippi/ccusage |
 | Chart.js | https://www.chartjs.org/docs/ |
 | VPS/Infra | `~/CLAUDE.md` |
