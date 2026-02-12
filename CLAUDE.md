@@ -14,16 +14,36 @@
 
 ## Vision y Filosofia
 
-**Control de stock de tokens Claude** — Trata los tokens como combustible: saber cuanto queda, a que ritmo se gasta, y cuando se va a agotar.
+**Monitoreo de gasolina real de Claude** — Los tokens de Claude son combustible finito que se resetea semanalmente. Este dashboard mide el consumo real para que alcance todos los dias.
 
-El dashboard responde tres preguntas clave:
-1. **Cuanto queda?** — Porcentajes reales de la cuenta Anthropic (via `/usage`)
-2. **A que ritmo voy?** — Pace semanal con indicador on track / acelerado / critico
-3. **Cuando se agota?** — Proyeccion de dia de agotamiento basada en ritmo actual
+### Principio clave: Gasolina Real
 
-Fuentes de datos:
-- **ccusage** — Parsea logs JSONL locales del VPS para bloques, tokens, costos y gaps
-- **Claude /usage** — Fuente de verdad real ejecutada via PTY, muestra porcentajes globales de la cuenta
+No todos los tokens son iguales. ~96% del volumen son **cacheReadTokens** (lectura de cache), que son gratis o muy baratos y **no consumen cuota**. Lo que realmente quema gasolina son:
+
+- `outputTokens` — Lo que Claude genera
+- `inputTokens` — Contexto nuevo que Claude procesa
+- `cacheCreationInputTokens` — Primera escritura a cache
+
+**Formula:** `realTokens = totalTokens - cacheReadTokens`
+
+Solo medimos gasolina real. Todo lo demas es ruido.
+
+### Preguntas que responde
+
+1. **Cuanto queda?** — % semanal real (alineado con Claude `/usage`)
+2. **A que ritmo voy?** — Pace semanal: on track / acelerado / critico
+3. **Cuando se agota?** — Proyeccion de dia de agotamiento
+4. **Cuanta gasolina queme hoy/esta semana?** — Tokens reales (sin cache reads)
+
+### Fuentes de datos
+
+- **ccusage** — Parsea logs JSONL locales para bloques y tokens (VPS + laptop via sync)
+- **Claude /usage** — Fuente de verdad: porcentajes globales de la cuenta via PTY
+- **Datos externos** — Laptop sincroniza via `push-usage.sh` → POST `/api/external-usage`
+
+### Metodologia detallada
+
+Ver `TECHNICAL-NOTES.md` para la explicacion completa del metodo de medicion, que ignoramos, y por que.
 
 | Aspecto | Valor |
 |---------|-------|
@@ -97,6 +117,7 @@ token-dashboard/
 ├── data/
 │   └── external/       # Datos externos (laptop.json, etc)
 ├── CLAUDE.md           # Este archivo
+├── TECHNICAL-NOTES.md  # Metodologia: gasolina real, que medimos, que ignoramos
 ├── LOCALSETUP.md       # Setup laptop: hooks, Task Scheduler, sync
 ├── LIMITATIONS.md      # Limitaciones conocidas (IMPORTANTE)
 └── package.json
@@ -111,6 +132,9 @@ token-dashboard/
 | `/api/refresh` | GET | Fuerza actualizacion de cache ccusage |
 | `/api/global-usage` | GET | **Uso global real** (Claude /usage via PTY) |
 | `/api/global-usage/refresh` | GET | Fuerza refresh de global usage |
+| `/api/external-usage` | POST | Recibe datos de fuentes externas (laptop) |
+| `/api/external-usage` | GET | Lista datos de todas las fuentes externas |
+| `/api/weekly-history` | GET | Historial de eficiencia semanal |
 
 **Global Usage:** Ejecuta Claude Code via PTY (~15-20s), cache 5 min. Retorna session%, weekAll%, weekSonnet%, extraUsage.
 
@@ -118,9 +142,9 @@ token-dashboard/
 
 ### Metricas del Dashboard
 
-**Tab Overview:** Uso global real, pace semanal, proyeccion de agotamiento, ventana activa (5h), tokens usados, costo equivalente, burn rate, chart diario (14d), chart por franja horaria (0-23h).
+**Tab Overview:** Uso global real (% semanal), pace semanal, proyeccion de agotamiento, sesion actual, gasolina semanal (tokens reales), promedio diario, gasolina hoy. Charts de uso diario y por franja horaria (solo tokens reales, sin cache reads).
 
-**Tab Gaps:** Resumen diario de horas/tokens perdidos, gaps individuales, estimado ~500K tokens/hora.
+**Tab Eficiencia:** Eficiencia semanal actual (% usado vs disponible), historial de semanas anteriores, tokens combinados VPS+Laptop.
 
 ---
 
@@ -161,9 +185,12 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 ### Convenciones
 
 - **Frontend inline** — Todo en un solo `index.html` (HTML, CSS, JS). No hay build step
-- **Consumo combinado** — No hay separacion por usuario, se muestra total
+- **Solo gasolina real** — Siempre mostrar `totalTokens - cacheReadTokens`. Nunca inflar numeros con cache reads
+- **Consumo combinado** — VPS + Laptop, no hay separacion por usuario
 - **ccusage es externo** — No modificamos esa tool, solo la consumimos
 - **PM2 para produccion** — Nunca `node server.js` directo
+- **Timezone Panama (UTC-5)** — Todas las fechas pasan por `getPanamaDate()`. Usar metodos UTC (`getUTCDate()`, `setUTCHours()`, etc). Nunca metodos locales del browser. Ver `TECHNICAL-NOTES.md` seccion Timezone
+- **Ciclo semanal rolling** — La semana de Claude NO es lun-dom. Es un ciclo de 7 dias con reset a una hora especifica (`weekAll.resetsAtHour`). Nunca asumir dia de semana fijo
 
 ### Estilo Visual
 
@@ -180,7 +207,7 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 
 ### Mobile-friendly
 
-- La tabla de gaps debe ser legible en movil
+- Tablas y cards deben ser legibles en movil
 - Usar valores compactos (ej: `02-08` en vez de `2026-02-08`)
 - Evitar scroll horizontal cuando sea posible
 
@@ -212,7 +239,8 @@ ccusage solo ve logs JSONL locales. El VPS captura sus propios logs y la laptop 
 
 | Necesidad | Recurso |
 |-----------|---------|
-| Limitaciones | `LIMITATIONS.md` (en este directorio) |
+| Metodologia de medicion | `TECHNICAL-NOTES.md` — Que medimos, que ignoramos, por que |
+| Limitaciones | `LIMITATIONS.md` |
 | Setup Laptop | `LOCALSETUP.md` (sync laptop → VPS, hooks, Task Scheduler) |
 | ccusage docs | https://github.com/ryoppippi/ccusage |
 | Chart.js | https://www.chartjs.org/docs/ |

@@ -292,6 +292,54 @@
     .progress-fill.yellow { background: linear-gradient(90deg, #fbbf24, #f97316); }
     .progress-fill.red { background: linear-gradient(90deg, #f87171, #ef4444); }
 
+    /* Fuel Gauges */
+    .gauges-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .gauges-row { grid-template-columns: 1fr; }
+    }
+
+    .gauge-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 20px 20px 16px;
+      text-align: center;
+    }
+
+    .gauge-title {
+      font-size: 0.75em;
+      font-weight: 600;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    .gauge-svg {
+      width: 100%;
+      max-width: 220px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    .gauge-info {
+      font-size: 0.8em;
+      color: #71717a;
+      margin-top: 4px;
+    }
+
+    .gauge-detail {
+      font-size: 0.72em;
+      color: #52525b;
+      margin-top: 2px;
+    }
+
     /* Color variants */
     .green { color: #4ade80; }
     .yellow { color: #fbbf24; }
@@ -594,72 +642,152 @@
       letter-spacing: 0.5px;
     }
 
-    /* Gaps List */
-    .gaps-card {
+    /* Efficiency Card */
+    .eff-card {
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 16px;
       padding: 20px;
+      margin-bottom: 16px;
     }
 
-    .gaps-header {
+    .eff-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 16px;
     }
 
-    .gaps-title {
+    .eff-title {
       font-size: 0.95em;
       font-weight: 600;
       color: #a1a1aa;
     }
 
-    .gaps-stats {
+    .eff-main {
       display: flex;
-      gap: 16px;
+      align-items: center;
+      gap: 32px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .eff-main { flex-direction: column; gap: 16px; align-items: flex-start; }
+    }
+
+    .eff-big {
+      text-align: center;
+    }
+
+    .eff-big-number {
+      font-size: 3em;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .eff-big-label {
+      font-size: 0.75em;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    .eff-bar {
+      height: 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .eff-bar-used {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .eff-bar-risk {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(248,113,113,0.15),
+        rgba(248,113,113,0.15) 4px,
+        transparent 4px,
+        transparent 8px
+      );
+      border-radius: 0 6px 6px 0;
+    }
+
+    .eff-details {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .eff-details { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .eff-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+    }
+
+    .eff-detail-label {
+      font-size: 0.7em;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .eff-detail-value {
+      font-size: 1.1em;
+      font-weight: 600;
+    }
+
+    /* History table */
+    .eff-history-table {
+      width: 100%;
+      border-collapse: collapse;
       font-size: 0.8em;
     }
 
-    .gaps-stat {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .gaps-list {
-      list-style: none;
-    }
-
-    .gaps-list li {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      background: rgba(248,113,113,0.05);
-      border-left: 3px solid #f87171;
-      border-radius: 0 8px 8px 0;
-      margin-bottom: 8px;
-      font-size: 0.875em;
-    }
-
-    .gaps-list li.success {
-      background: rgba(74,222,128,0.05);
-      border-left-color: #4ade80;
-    }
-
-    .gap-icon {
-      font-size: 1.1em;
-    }
-
-    .gap-duration {
-      font-weight: 600;
-      color: #f87171;
-      min-width: 60px;
-    }
-
-    .gap-time {
+    .eff-history-table th {
+      text-align: left;
+      padding: 8px 6px;
       color: #71717a;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-weight: 500;
+    }
+
+    .eff-history-table th:not(:first-child) {
+      text-align: right;
+    }
+
+    .eff-history-table td {
+      padding: 10px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .eff-history-table td:not(:first-child) {
+      text-align: right;
+    }
+
+    .eff-week-bar {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      margin-right: 8px;
+      vertical-align: middle;
     }
 
     /* Footer */
@@ -710,9 +838,9 @@
         <span class="tab-icon">📈</span>
         <span>Overview</span>
       </button>
-      <button class="tab" data-tab="gaps">
-        <span class="tab-icon">⚠️</span>
-        <span>Gaps</span>
+      <button class="tab" data-tab="eficiencia">
+        <span class="tab-icon">🎯</span>
+        <span>Eficiencia</span>
       </button>
     </div>
 
@@ -748,7 +876,7 @@
             </div>
             <div class="global-usage-value" id="global-sonnet">—%</div>
           </div>
-          <div class="global-usage-item extra">
+          <div class="global-usage-item extra" id="global-extra-container" style="display:none;">
             <div class="global-usage-label">Extra Usage</div>
             <div class="global-usage-value" id="global-extra">—</div>
           </div>
@@ -790,12 +918,12 @@
           <div class="cycle-item-label">Costo Equiv.</div>
         </div>
         <div class="cycle-item">
-          <div class="cycle-item-value yellow" id="cycle-gaps">—</div>
-          <div class="cycle-item-label">Gaps</div>
+          <div class="cycle-item-value" id="cycle-week-pct">—</div>
+          <div class="cycle-item-label">% Semanal</div>
         </div>
         <div class="cycle-item">
-          <div class="cycle-item-value green" id="cycle-efficiency">—</div>
-          <div class="cycle-item-label">Eficiencia</div>
+          <div class="cycle-item-value" id="cycle-risk">—</div>
+          <div class="cycle-item-label">En Riesgo</div>
         </div>
         <div class="cycle-item">
           <div class="cycle-item-value" id="cycle-pace">—</div>
@@ -803,39 +931,53 @@
         </div>
       </div>
 
-      <!-- Stats Grid -->
-      <div class="stats-grid">
-        <div class="stat-card" style="--accent-color: #4ade80; --icon-bg: rgba(74,222,128,0.15);">
-          <div class="stat-icon">⏰</div>
-          <div class="stat-label">Sesion Actual</div>
-          <div class="stat-value green" id="window-status">—</div>
-          <div class="stat-sub" id="window-time"></div>
-          <div class="progress-container">
-            <div class="progress-bar">
-              <div class="progress-fill green" id="window-progress" style="width: 0%"></div>
-            </div>
-          </div>
+      <!-- Fuel Gauges -->
+      <div class="gauges-row">
+        <div class="gauge-card">
+          <div class="gauge-title">Tanque Sesion</div>
+          <svg viewBox="0 0 200 115" class="gauge-svg">
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1f1f28" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#2a2a35" stroke-width="14" stroke-linecap="round"
+              id="session-gauge-arc" stroke-dasharray="0 251"/>
+            <text x="15" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">F</text>
+            <text x="181" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">E</text>
+            <text x="100" y="78" text-anchor="middle" fill="#71717a" font-size="28" font-weight="700" font-family="Inter" id="session-gauge-val">—</text>
+            <text x="100" y="96" text-anchor="middle" fill="#52525b" font-size="11" font-family="Inter" id="session-gauge-label">restante</text>
+          </svg>
+          <div class="gauge-info" id="session-gauge-info">Cargando...</div>
         </div>
 
-        <div class="stat-card" style="--accent-color: #22d3ee; --icon-bg: rgba(34,211,238,0.15);">
-          <div class="stat-icon">📊</div>
-          <div class="stat-label">Tokens Usados</div>
-          <div class="stat-value cyan" id="tokens-used">—</div>
-          <div class="stat-sub" id="tokens-remaining"></div>
+        <div class="gauge-card">
+          <div class="gauge-title">Tanque Semanal</div>
+          <svg viewBox="0 0 200 115" class="gauge-svg">
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1f1f28" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#2a2a35" stroke-width="14" stroke-linecap="round"
+              id="week-gauge-arc" stroke-dasharray="0 251"/>
+            <text x="15" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">F</text>
+            <text x="181" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">E</text>
+            <text x="100" y="78" text-anchor="middle" fill="#71717a" font-size="28" font-weight="700" font-family="Inter" id="week-gauge-val">—</text>
+            <text x="100" y="96" text-anchor="middle" fill="#52525b" font-size="11" font-family="Inter" id="week-gauge-label">restante</text>
+          </svg>
+          <div class="gauge-info" id="week-gauge-info">Cargando...</div>
+          <div class="gauge-detail" id="week-gauge-detail"></div>
+        </div>
+      </div>
+
+      <!-- Consumption Cards -->
+      <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="stat-card" style="--accent-color: #f97316; --icon-bg: rgba(249,115,22,0.15);">
+          <div class="stat-icon">🔥</div>
+          <div class="stat-label">Gastado Hoy</div>
+          <div class="stat-value" style="color: #f97316;" id="fuel-today">—</div>
+          <div class="stat-sub" id="fuel-today-sub"></div>
+          <div class="stat-sub" style="color:#52525b;">Reset: medianoche</div>
         </div>
 
         <div class="stat-card" style="--accent-color: #a78bfa; --icon-bg: rgba(167,139,250,0.15);">
-          <div class="stat-icon">💰</div>
-          <div class="stat-label">Costo Equivalente</div>
-          <div class="stat-value purple" id="cost-current">—</div>
-          <div class="stat-sub" id="cost-projected"></div>
-        </div>
-
-        <div class="stat-card" style="--accent-color: #f97316; --icon-bg: rgba(249,115,22,0.15);">
-          <div class="stat-icon">🔥</div>
-          <div class="stat-label">Burn Rate</div>
-          <div class="stat-value" style="color: #f97316;" id="burn-rate">—</div>
-          <div class="stat-sub" id="burn-projection"></div>
+          <div class="stat-icon">📊</div>
+          <div class="stat-label">Promedio Diario</div>
+          <div class="stat-value purple" id="fuel-avg">—</div>
+          <div class="stat-sub" id="fuel-avg-sub"></div>
         </div>
       </div>
 
@@ -843,7 +985,7 @@
       <div class="charts-grid">
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">📈 Uso Diario Total (14 dias)</span>
+            <span class="chart-title">⛽ Gasolina Diaria Real (14 dias)</span>
             <div class="chart-legend" id="daily-chart-legend">
               <span class="legend-item">
                 <span class="legend-dot" style="background: #4ade80;"></span>
@@ -858,7 +1000,7 @@
 
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">🕐 Consumo por Franja Horaria</span>
+            <span class="chart-title">🕐 Gasolina por Franja Horaria</span>
             <div class="chart-legend" id="hourly-chart-legend">
               <span class="legend-item">
                 <span class="legend-dot" style="background: #4ade80;"></span>
@@ -873,41 +1015,72 @@
       </div>
     </div>
 
-    <!-- Tab: Gaps -->
-    <div class="tab-content" id="tab-gaps">
-      <!-- Daily Summary -->
-      <div class="gaps-card" style="margin-bottom: 16px;">
-        <div class="gaps-header">
-          <span class="gaps-title">📅 Resumen Diario (Horas y Tokens Perdidos)</span>
+    <!-- Tab: Eficiencia -->
+    <div class="tab-content" id="tab-eficiencia">
+      <!-- Current Week -->
+      <div class="eff-card">
+        <div class="eff-header">
+          <span class="eff-title">📊 Esta Semana</span>
+          <span style="font-size: 0.8em; color: #52525b;" id="eff-day-info">—</span>
         </div>
-        <div id="daily-gaps-summary" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 320px;">
-            <thead>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <th style="text-align: left; padding: 8px 4px; color: #71717a;">Fecha</th>
-                <th style="text-align: right; padding: 8px 4px; color: #71717a;">Horas</th>
-                <th style="text-align: right; padding: 8px 4px; color: #71717a;">Tokens</th>
-                <th style="text-align: right; padding: 8px 4px; color: #71717a;">USD</th>
-              </tr>
-            </thead>
-            <tbody id="daily-gaps-table">
-              <tr><td colspan="4" style="padding: 12px; text-align: center; color: #52525b;">Cargando...</td></tr>
-            </tbody>
-          </table>
+
+        <div class="eff-main">
+          <div class="eff-big">
+            <div class="eff-big-number green" id="eff-used-pct">—%</div>
+            <div class="eff-big-label">Consumido</div>
+          </div>
+          <div class="eff-big">
+            <div class="eff-big-number red" id="eff-risk-pct">—%</div>
+            <div class="eff-big-label">En riesgo de expirar</div>
+          </div>
+        </div>
+
+        <div class="eff-bar" id="eff-bar">
+          <div class="eff-bar-used" id="eff-bar-used" style="width: 0%; background: linear-gradient(90deg, #4ade80, #22d3ee);"></div>
+          <div class="eff-bar-risk" id="eff-bar-risk" style="width: 0%;"></div>
+        </div>
+
+        <div class="eff-details">
+          <div class="eff-detail">
+            <span class="eff-detail-label">Tokens combinados</span>
+            <span class="eff-detail-value cyan" id="eff-combined">—</span>
+          </div>
+          <div class="eff-detail">
+            <span class="eff-detail-label">Estimado 100%</span>
+            <span class="eff-detail-value purple" id="eff-allocation">—</span>
+          </div>
+          <div class="eff-detail">
+            <span class="eff-detail-label">VPS</span>
+            <span class="eff-detail-value green" id="eff-vps">—</span>
+          </div>
+          <div class="eff-detail">
+            <span class="eff-detail-label">Laptop</span>
+            <span class="eff-detail-value cyan" id="eff-ext">—</span>
+          </div>
         </div>
       </div>
 
-      <!-- Individual Gaps -->
-      <div class="gaps-card">
-        <div class="gaps-header">
-          <span class="gaps-title">⚠️ Gaps Individuales</span>
-          <div class="gaps-stats" id="gaps-stats">
-            <!-- Filled by JS -->
-          </div>
+      <!-- Weekly History -->
+      <div class="eff-card">
+        <div class="eff-header">
+          <span class="eff-title">📅 Historial Semanal</span>
         </div>
-        <ul class="gaps-list" id="gaps-list">
-          <li>Cargando...</li>
-        </ul>
+        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+          <table class="eff-history-table">
+            <thead>
+              <tr>
+                <th>Semana</th>
+                <th>Dia</th>
+                <th>% Usado</th>
+                <th>Tokens</th>
+                <th>Est. 100%</th>
+              </tr>
+            </thead>
+            <tbody id="eff-history-body">
+              <tr><td colspan="5" style="text-align:center; padding: 16px; color: #52525b;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -921,6 +1094,7 @@
     let dailyChart = null;
     let hourlyChart = null;
     let externalData = null; // { sources: { laptop: { blocks, daily, lastUpdate } } }
+    let weeklyResetHour = null; // Hour (0-23) when Claude's week resets, from /usage
 
     const PANAMA_OFFSET = -5;
 
@@ -933,6 +1107,19 @@
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
       });
     });
+
+    // Central Panama time helper — all dates go through here
+    function getPanamaDate(date) {
+      const d = date || new Date();
+      const utcMs = d.getTime();
+      const panamaMs = utcMs + (PANAMA_OFFSET * 3600000);
+      return new Date(panamaMs);
+    }
+
+    // Get today's date string in Panama timezone (YYYY-MM-DD)
+    function getPanamaTodayISO() {
+      return getPanamaDate().toISOString().split('T')[0];
+    }
 
     function formatNumber(n) {
       if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
@@ -947,22 +1134,24 @@
     }
 
     function getBillingCycleDates() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const day = now.getDate();
+      // Use Panama time for billing cycle boundaries
+      const panama = getPanamaDate();
+      const year = panama.getUTCFullYear();
+      const month = panama.getUTCMonth();
+      const day = panama.getUTCDate();
 
       let cycleStart, cycleEnd;
 
       if (day >= 2) {
-        cycleStart = new Date(year, month, 2);
-        cycleEnd = new Date(year, month + 1, 2);
+        cycleStart = new Date(Date.UTC(year, month, 2));
+        cycleEnd = new Date(Date.UTC(year, month + 1, 2));
       } else {
-        cycleStart = new Date(year, month - 1, 2);
-        cycleEnd = new Date(year, month, 2);
+        cycleStart = new Date(Date.UTC(year, month - 1, 2));
+        cycleEnd = new Date(Date.UTC(year, month, 2));
       }
 
-      const daysLeft = Math.ceil((cycleEnd - now) / (1000 * 60 * 60 * 24));
+      const nowMs = panama.getTime();
+      const daysLeft = Math.ceil((cycleEnd - nowMs) / (1000 * 60 * 60 * 24));
       const totalDays = Math.ceil((cycleEnd - cycleStart) / (1000 * 60 * 60 * 24));
 
       return { cycleStart, cycleEnd, daysLeft, totalDays };
@@ -979,24 +1168,11 @@
 
       const cycleBlocks = blocks.filter(b => isInCurrentCycle(b.startTime));
       const activeBlocks = cycleBlocks.filter(b => !b.isGap);
-      const gapBlocks = cycleBlocks.filter(b => b.isGap);
 
-      const cycleTokens = activeBlocks.reduce((sum, b) => sum + b.totalTokens, 0);
+      const cycleTokens = activeBlocks.reduce((sum, b) => sum + blockRealTokens(b), 0);
       const cycleCost = activeBlocks.reduce((sum, b) => sum + b.costUSD, 0);
-      const cycleGapHours = gapBlocks.reduce((sum, b) => {
-        return sum + (new Date(b.endTime) - new Date(b.startTime)) / 3600000;
-      }, 0);
 
-      const elapsedDays = totalDays - daysLeft;
-      const possibleHours = elapsedDays * 24;
-      const activeHours = activeBlocks.reduce((sum, b) => {
-        const duration = (new Date(b.actualEndTime || b.endTime) - new Date(b.startTime)) / 3600000;
-        return sum + Math.min(duration, 5);
-      }, 0);
-
-      const efficiency = possibleHours > 0 ? Math.min(100, (activeHours / possibleHours) * 100) : 0;
-
-      return { cycleStart, cycleEnd, daysLeft, cycleTokens, cycleCost, cycleGapHours, gapCount: gapBlocks.length, efficiency };
+      return { cycleStart, cycleEnd, daysLeft, cycleTokens, cycleCost };
     }
 
     function getLocalHour(utcDateStr) {
@@ -1007,13 +1183,13 @@
       return localHour;
     }
 
-    // Aggregate tokens by hour of day (0-23) for hourly chart
+    // Aggregate real tokens by hour of day (0-23) for hourly chart
     function aggregateByHour(blocks) {
       const byHour = new Array(24).fill(0);
 
       blocks.filter(b => !b.isGap && isInCurrentCycle(b.startTime)).forEach(block => {
         const hour = getLocalHour(block.startTime);
-        byHour[hour] += block.totalTokens;
+        byHour[hour] += blockRealTokens(block);
       });
 
       return byHour;
@@ -1030,14 +1206,25 @@
       }
     }
 
-    // Merge external daily data into a map { date: totalTokens }
+    // Real tokens from a daily entry (totalTokens - cacheReadTokens)
+    function dailyRealTokens(d) {
+      return (d.totalTokens || 0) - (d.cacheReadTokens || 0);
+    }
+
+    // Real tokens from a block entry (totalTokens - cacheReadInputTokens)
+    function blockRealTokens(b) {
+      const cacheRead = b.tokenCounts?.cacheReadInputTokens || b.cacheReadInputTokens || 0;
+      return (b.totalTokens || 0) - cacheRead;
+    }
+
+    // Merge external daily data into a map { date: realTokens }
     function getExternalDailyMap() {
       const map = {};
       if (!externalData?.sources) return map;
       for (const src of Object.values(externalData.sources)) {
         if (!src.daily?.daily) continue;
         for (const d of src.daily.daily) {
-          map[d.date] = (map[d.date] || 0) + d.totalTokens;
+          map[d.date] = (map[d.date] || 0) + dailyRealTokens(d);
         }
       }
       return map;
@@ -1054,11 +1241,11 @@
       return allBlocks;
     }
 
-    // Get external cycle tokens and cost
+    // Get external cycle real tokens and cost
     function getExternalCycleStats() {
       const extBlocks = getExternalBlocks();
       const cycleBlocks = extBlocks.filter(b => !b.isGap && isInCurrentCycle(b.startTime));
-      const tokens = cycleBlocks.reduce((sum, b) => sum + (b.totalTokens || 0), 0);
+      const tokens = cycleBlocks.reduce((sum, b) => sum + blockRealTokens(b), 0);
       const cost = cycleBlocks.reduce((sum, b) => sum + (b.costUSD || 0), 0);
       return { tokens, cost };
     }
@@ -1069,33 +1256,53 @@
         const data = await res.json();
 
         if (!data.blocks?.blocks || !data.daily?.daily) {
-          document.getElementById('window-status').textContent = 'Sin datos';
+          document.getElementById('session-gauge-info').textContent = 'Sin datos';
           return;
         }
 
         const blocks = data.blocks.blocks;
         const activeBlock = blocks.find(b => b.isActive);
-        const gaps = blocks.filter(b => b.isGap && b.totalTokens === 0);
 
-        // Window status (session % and reset come from loadGlobalUsage)
-        if (activeBlock) {
+        // Consumption cards: real tokens (no cache reads)
+        {
+          const cycle = getWeekCycleInfo();
+          const todayISO = getPanamaTodayISO();
 
-          document.getElementById('tokens-used').textContent = formatNumber(activeBlock.totalTokens);
-          document.getElementById('tokens-remaining').textContent = `~${formatNumber(50000000 - activeBlock.totalTokens)} disponibles`;
+          // Weekly real tokens (for average calc) — use Claude's actual cycle start
+          const vpsWeekFuel = blocks.filter(b => !b.isGap && b.startTime >= cycle.cycleStartISO)
+            .reduce((sum, b) => sum + blockRealTokens(b), 0);
+          const extBlocks = getExternalBlocks();
+          const extWeekFuel = extBlocks.filter(b => !b.isGap && b.startTime >= cycle.cycleStartISO)
+            .reduce((sum, b) => sum + blockRealTokens(b), 0);
+          const totalWeekFuel = vpsWeekFuel + extWeekFuel;
+          const avgDaily = cycle.elapsedDays > 0 ? totalWeekFuel / cycle.elapsedDays : 0;
 
-          document.getElementById('cost-current').textContent = '$' + activeBlock.costUSD.toFixed(2);
-          document.getElementById('cost-projected').textContent = `Proyectado: $${activeBlock.projection?.totalCost?.toFixed(2) || '—'}`;
+          // Today
+          const vpsTodayEntry = data.daily.daily.find(d => d.date === todayISO);
+          const vpsTodayFuel = vpsTodayEntry ? dailyRealTokens(vpsTodayEntry) : 0;
+          const extDailyMapToday = getExternalDailyMap();
+          const extTodayFuel = extDailyMapToday[todayISO] || 0;
+          const totalTodayFuel = vpsTodayFuel + extTodayFuel;
 
-          if (activeBlock.burnRate) {
-            document.getElementById('burn-rate').textContent = formatNumber(activeBlock.burnRate.tokensPerMinute) + '/min';
-            document.getElementById('burn-projection').textContent = `$${activeBlock.burnRate.costPerHour.toFixed(2)}/hora`;
-          }
+          // Gastado Hoy
+          document.getElementById('fuel-today').textContent = formatNumber(totalTodayFuel);
+          document.getElementById('fuel-today-sub').textContent = extTodayFuel > 0
+            ? `VPS ${formatNumber(vpsTodayFuel)} + Laptop ${formatNumber(extTodayFuel)}`
+            : `${formatNumber(totalWeekFuel)} esta semana`;
+
+          // Promedio Diario
+          document.getElementById('fuel-avg').textContent = formatNumber(avgDaily);
+          const daysLabel = Math.round(cycle.elapsedDays * 10) / 10;
+          document.getElementById('fuel-avg-sub').textContent =
+            `${formatNumber(totalWeekFuel)} en ${daysLabel}d este ciclo`;
         }
 
         // Cycle stats
         const cycleStats = analyzeBillingCycle(blocks);
-        const startStr = cycleStats.cycleStart.toLocaleDateString('es-PA', { month: 'short', day: 'numeric' });
-        const endStr = cycleStats.cycleEnd.toLocaleDateString('es-PA', { month: 'short', day: 'numeric' });
+        const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        const fmtBilling = d => `${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
+        const startStr = fmtBilling(cycleStats.cycleStart);
+        const endStr = fmtBilling(cycleStats.cycleEnd);
         document.getElementById('cycle-range').textContent = `${startStr} → ${endStr}`;
         document.getElementById('cycle-days-left').textContent = `${cycleStats.daysLeft}d`;
         const extStats = getExternalCycleStats();
@@ -1107,86 +1314,6 @@
           (hasExternal ? ` <span style="font-size:0.6em;color:#71717a">(VPS ${formatNumber(cycleStats.cycleTokens)} + Ext ${formatNumber(extStats.tokens)})</span>` : '');
         document.getElementById('cycle-cost').innerHTML = `$${totalCycleCost.toFixed(0)}` +
           (hasExternal ? ` <span style="font-size:0.6em;color:#71717a">($${cycleStats.cycleCost.toFixed(0)}+$${extStats.cost.toFixed(0)})</span>` : '');
-        document.getElementById('cycle-gaps').textContent = `${cycleStats.gapCount}`;
-        document.getElementById('cycle-efficiency').textContent = `${cycleStats.efficiency.toFixed(0)}%`;
-
-        // Gaps
-        const totalGapHours = gaps.reduce((sum, g) => sum + (new Date(g.endTime) - new Date(g.startTime)) / 3600000, 0);
-
-        document.getElementById('gaps-stats').innerHTML = `
-          <span class="gaps-stat"><span class="red">${gaps.length}</span> gaps</span>
-          <span class="gaps-stat"><span class="yellow">${totalGapHours.toFixed(0)}h</span> total</span>
-          <span class="gaps-stat">~<span>$${(totalGapHours * 2).toFixed(0)}</span> valor</span>
-        `;
-
-        // Daily gaps summary (cap at 24h per day)
-        const TOKENS_PER_HOUR = 500000;
-        const TOKEN_TO_USD = 0.0000007;
-        const dailyGaps = {};
-
-        gaps.forEach(g => {
-          const gapStart = new Date(g.startTime);
-          const gapEnd = new Date(g.endTime);
-
-          let current = new Date(gapStart);
-          current.setHours(0, 0, 0, 0);
-
-          while (current < gapEnd) {
-            const dayKey = current.toISOString().split('T')[0];
-            const dayStart = new Date(current);
-            const dayEnd = new Date(current);
-            dayEnd.setHours(23, 59, 59, 999);
-
-            const effectiveStart = gapStart > dayStart ? gapStart : dayStart;
-            const effectiveEnd = gapEnd < dayEnd ? gapEnd : dayEnd;
-            const hoursThisDay = Math.max(0, (effectiveEnd - effectiveStart) / 3600000);
-
-            if (!dailyGaps[dayKey]) dailyGaps[dayKey] = 0;
-            dailyGaps[dayKey] += hoursThisDay;
-
-            current.setDate(current.getDate() + 1);
-          }
-        });
-
-        const dailyGapsTable = document.getElementById('daily-gaps-table');
-        const sortedDays = Object.keys(dailyGaps).sort().reverse().slice(0, 14);
-
-        if (sortedDays.length > 0) {
-          dailyGapsTable.innerHTML = sortedDays.map(day => {
-            const rawHours = dailyGaps[day];
-            const cappedHours = Math.min(rawHours, 24);
-            const tokensLost = Math.round(cappedHours * TOKENS_PER_HOUR);
-            const valueLost = tokensLost * TOKEN_TO_USD;
-            const barColor = cappedHours > 12 ? '#f87171' : cappedHours > 6 ? '#fbbf24' : '#4ade80';
-
-            return `
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <td style="padding: 8px 4px; white-space: nowrap;">${day.slice(5)}</td>
-                <td style="padding: 8px 4px; text-align: right;">
-                  <span style="color: ${barColor}; font-weight: 600;">${cappedHours.toFixed(1)}h</span>
-                </td>
-                <td style="padding: 8px 4px; text-align: right; color: #a78bfa;">${formatNumber(tokensLost)}</td>
-                <td style="padding: 8px 4px; text-align: right; color: #f87171; white-space: nowrap;">$${valueLost.toFixed(0)}</td>
-              </tr>
-            `;
-          }).join('');
-        } else {
-          dailyGapsTable.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #4ade80;">Sin gaps recientes</td></tr>';
-        }
-
-        const gapsList = document.getElementById('gaps-list');
-        if (gaps.length > 0) {
-          gapsList.innerHTML = gaps.slice(-8).reverse().map(g => {
-            const start = new Date(g.startTime).toLocaleString('es-PA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const end = new Date(g.endTime).toLocaleString('es-PA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const hours = ((new Date(g.endTime) - new Date(g.startTime)) / 3600000).toFixed(1);
-            const spansMultipleDays = hours > 24;
-            return `<li><span class="gap-icon">${spansMultipleDays ? '📅' : '🕐'}</span><span class="gap-duration">${hours}h</span><span class="gap-time">${start} → ${end}${spansMultipleDays ? ' (multi-dia)' : ''}</span></li>`;
-          }).join('');
-        } else {
-          gapsList.innerHTML = '<li class="success"><span class="gap-icon">✅</span>No hay gaps recientes</li>';
-        }
-
         // Charts
         const dailyData = data.daily.daily.slice(-14);
         const hourlyData = aggregateByHour(blocks);
@@ -1200,7 +1327,7 @@
 
       } catch (error) {
         console.error('Error:', error);
-        document.getElementById('window-status').textContent = 'Error';
+        document.getElementById('session-gauge-info').textContent = 'Error cargando datos';
       }
     }
 
@@ -1227,7 +1354,7 @@
     function updateDailyChart(dailyData, extDailyMap) {
       const ctx = document.getElementById('dailyChart').getContext('2d');
       const labels = dailyData.map(d => d.date.slice(5));
-      const vpsTokens = dailyData.map(d => d.totalTokens / 1000000);
+      const vpsTokens = dailyData.map(d => dailyRealTokens(d) / 1000000);
       const extTokens = dailyData.map(d => (extDailyMap[d.date] || 0) / 1000000);
       const hasExt = extTokens.some(v => v > 0);
 
@@ -1351,22 +1478,81 @@
     }
 
     async function refresh() {
-      document.getElementById('window-status').textContent = '...';
+      document.getElementById('session-gauge-info').textContent = 'Actualizando...';
       await fetch('/api/refresh');
       await loadData();
     }
 
-    // Weekly pace calculation
+    // Weekly cycle calculation based on Claude's actual reset time
+    // Claude resets every 7 days at a specific hour (e.g. 10am Panama).
+    // We compute: next reset, cycle start, days elapsed, days remaining.
+    function getWeekCycleInfo() {
+      // Use direct UTC-5 offset (same approach as server.js)
+      const panama = getPanamaDate();
+
+      const resetHour = weeklyResetHour ?? 10; // default 10am if not loaded yet
+
+      // Next reset: today or tomorrow at resetHour Panama time
+      // We work in UTC on the panama-shifted Date object
+      let nextReset = new Date(panama);
+      nextReset.setUTCHours(resetHour, 0, 0, 0);
+      if (panama >= nextReset) {
+        nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+      }
+
+      // Hours until next reset
+      const hoursUntilReset = (nextReset - panama) / (1000 * 60 * 60);
+
+      // Cycle: 7 days. cycleStart = nextReset - 7 days
+      const cycleStart = new Date(nextReset);
+      cycleStart.setUTCDate(cycleStart.getUTCDate() - 7);
+
+      // Elapsed time in the cycle (in days, fractional)
+      const elapsedMs = panama - cycleStart;
+      const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+      const daysRemaining = 7 - elapsedDays;
+
+      // Day number 1-7 (integer, day 1 = first day of cycle)
+      const dayNum = Math.min(Math.ceil(elapsedDays), 7);
+
+      // Format dates for display using UTC methods on panama-shifted dates
+      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      const fmt = d => `${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
+
+      // Next reset display
+      const resetLabel = resetHour > 12 ? (resetHour - 12) + 'pm' :
+                        resetHour === 12 ? '12pm' :
+                        resetHour === 0 ? '12am' : resetHour + 'am';
+      const h = Math.floor(hoursUntilReset);
+      const m = Math.round((hoursUntilReset - h) * 60);
+      const resetIn = `${h}h ${m}m`;
+
+      // ISO string of cycle start for filtering blocks
+      const cycleStartISO = cycleStart.toISOString().split('T')[0] + `T${String(resetHour).padStart(2,'0')}:00:00`;
+
+      return {
+        dayNum,           // 1-7
+        elapsedDays,      // fractional
+        daysRemaining,    // fractional
+        cycleStart,
+        nextReset,
+        cycleStartISO,
+        resetHour,
+        resetLabel,
+        resetIn,
+        fmtStart: fmt(cycleStart),
+        fmtEnd: fmt(nextReset)
+      };
+    }
+
+    // Backwards-compatible wrapper
     function getWeekDayNumber() {
-      // Claude resets weekly on a specific day. We use a simple Mon=1..Sun=7 model
-      const now = new Date();
-      const day = now.getDay(); // 0=Sun, 1=Mon...6=Sat
-      return day === 0 ? 7 : day;
+      return getWeekCycleInfo().dayNum;
     }
 
     function updatePace(weekAllPercent) {
-      const dayNum = getWeekDayNumber();
-      const idealPercent = Math.round((dayNum / 7) * 100);
+      const cycle = getWeekCycleInfo();
+      const idealPercent = Math.round((cycle.elapsedDays / 7) * 100);
       const realPercent = weekAllPercent;
 
       // Determine status
@@ -1400,21 +1586,25 @@
       idealMarker.style.left = idealPercent + '%';
       idealMarker.setAttribute('data-label', `Ideal ${idealPercent}%`);
 
-      document.getElementById('pace-day-info').innerHTML = `Dia <strong>${dayNum}/7</strong> — Ideal: <strong>${idealPercent}%</strong> — Real: <strong>${realPercent}%</strong>`;
+      document.getElementById('pace-day-info').innerHTML =
+        `Dia <strong>${cycle.dayNum}/7</strong> — Ideal: <strong>${idealPercent}%</strong> — Real: <strong>${realPercent}%</strong>`;
 
       // Depletion projection
-      const daysRemaining = 7 - dayNum;
-      const ratePerDay = dayNum > 0 ? realPercent / dayNum : 0;
-      const projected = realPercent + (ratePerDay * daysRemaining);
+      const ratePerDay = cycle.elapsedDays > 0 ? realPercent / cycle.elapsedDays : 0;
+      const projected = realPercent + (ratePerDay * cycle.daysRemaining);
 
       if (projected > 100) {
         const daysUntilDepletion = (100 - realPercent) / Math.max(ratePerDay, 0.01);
-        const depletionDay = Math.ceil(dayNum + daysUntilDepletion);
-        const dayNames = ['', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
-        const depletionLabel = depletionDay <= 7 ? dayNames[depletionDay] : 'post-reset';
-        document.getElementById('pace-projection').innerHTML = `Se agota el <strong style="color:#f87171">${depletionLabel}</strong> (proy. ${Math.round(projected)}%)`;
+        // Calculate the actual date of depletion in Panama time
+        const depletionDate = getPanamaDate();
+        depletionDate.setUTCDate(depletionDate.getUTCDate() + Math.ceil(daysUntilDepletion));
+        const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+        const depletionLabel = dayNames[depletionDate.getUTCDay()] + ' ' + depletionDate.getUTCDate();
+        document.getElementById('pace-projection').innerHTML =
+          `Se agota el <strong style="color:#f87171">${depletionLabel}</strong> (proy. ${Math.round(projected)}%)`;
       } else {
-        document.getElementById('pace-projection').innerHTML = `Llegas al reset con <strong style="color:#4ade80">${Math.round(100 - projected)}%</strong> de margen`;
+        document.getElementById('pace-projection').innerHTML =
+          `Llegas al reset con <strong style="color:#4ade80">${Math.round(100 - projected)}%</strong> de margen`;
       }
 
       // Update cycle-pace in summary row
@@ -1423,32 +1613,43 @@
       paceEl.className = 'cycle-item-value ' + (statusClass === 'on-track' ? 'green' : statusClass === 'accelerated' ? 'yellow' : 'red');
     }
 
-    // Update session card with real data from /usage
+    // Fuel gauge helper
+    function updateGauge(arcId, valId, labelId, remaining) {
+      const arc = document.getElementById(arcId);
+      const val = document.getElementById(valId);
+      const label = document.getElementById(labelId);
+      const totalLen = 251; // π * 80 (semicircle arc length)
+      const fillLen = totalLen * Math.max(0, Math.min(remaining, 100)) / 100;
+
+      // Color based on remaining fuel
+      let color;
+      if (remaining > 50) color = '#4ade80';
+      else if (remaining > 20) color = '#fbbf24';
+      else color = '#f87171';
+
+      arc.setAttribute('stroke-dasharray', `${fillLen} ${totalLen - fillLen}`);
+      arc.setAttribute('stroke', color);
+      val.textContent = remaining + '%';
+      val.setAttribute('fill', color);
+      if (label) label.setAttribute('fill', '#71717a');
+    }
+
+    // Update session gauge with real data from /usage
     function updateSessionCard(session) {
       const percent = session.percent;
+      const remaining = 100 - percent;
       const resetsAtHour = session.resetsAtHour;
 
-      document.getElementById('window-status').textContent = percent + '%';
-      document.getElementById('window-status').className = 'stat-value ' +
-        (percent > 80 ? 'red' : percent > 50 ? 'yellow' : 'green');
-
-      const progressBar = document.getElementById('window-progress');
-      progressBar.style.width = percent + '%';
-      progressBar.className = 'progress-fill';
-      if (percent > 80) progressBar.classList.add('red');
-      else if (percent > 50) progressBar.classList.add('yellow');
-      else progressBar.classList.add('green');
+      updateGauge('session-gauge-arc', 'session-gauge-val', 'session-gauge-label', remaining);
 
       if (resetsAtHour !== null && resetsAtHour !== undefined) {
         const now = new Date();
-        // Build reset Date in Panama time (UTC-5)
         const utcNow = now.getTime();
         const panamaOffset = -5 * 60 * 60 * 1000;
         const panamaMs = utcNow + panamaOffset;
         const panamaDate = new Date(panamaMs);
         const panamaHour = panamaDate.getUTCHours();
 
-        // Calculate hours until reset
         let hoursUntil = resetsAtHour - panamaHour;
         if (hoursUntil <= 0) hoursUntil += 24;
 
@@ -1458,10 +1659,10 @@
 
         const h = Math.floor(hoursUntil);
         const m = Math.round((hoursUntil - h) * 60);
-        document.getElementById('window-time').textContent =
-          `Reset ${resetLabel} (${h}h ${m}m)`;
+        document.getElementById('session-gauge-info').textContent =
+          `Reset ${resetLabel} (${h}h ${m}m) | ${percent}% usado`;
       } else {
-        document.getElementById('window-time').textContent = 'Reset time no disponible';
+        document.getElementById('session-gauge-info').textContent = percent + '% usado';
       }
     }
 
@@ -1493,24 +1694,56 @@
             weekBar.style.background = 'linear-gradient(90deg, #fbbf24, #f97316)';
           }
 
-          // Extra usage
+          // Extra usage — only show if relevant
+          const extraContainer = document.getElementById('global-extra-container');
           if (data.extraUsage.enabled) {
+            extraContainer.style.display = '';
             document.getElementById('global-extra').innerHTML = '<span style="color:#4ade80">Enabled</span>';
           } else if (data.extraUsage.freeAvailable > 0) {
+            extraContainer.style.display = '';
             document.getElementById('global-extra').innerHTML = `<span style="color:#fbbf24">$${data.extraUsage.freeAvailable} free</span>`;
           } else {
-            document.getElementById('global-extra').textContent = 'No disponible';
+            extraContainer.style.display = 'none';
           }
 
           // Status
           const cacheNote = data.cached ? ` (cache ${data.cacheAge}m)` : ' (fresh)';
           statusEl.textContent = 'Actualizado: ' + new Date(data.timestamp).toLocaleTimeString('es-PA') + cacheNote;
 
-          // Update session card with real reset time
+          // Store weekly reset hour for cycle calculations
+          if (data.weekAll.resetsAtHour != null) {
+            weeklyResetHour = data.weekAll.resetsAtHour;
+          }
+
+          // Update session gauge
           updateSessionCard(data.session);
+
+          // Update weekly gauge
+          const weekRemaining = 100 - data.weekAll.percent;
+          updateGauge('week-gauge-arc', 'week-gauge-val', 'week-gauge-label', weekRemaining);
+          {
+            const cycle = getWeekCycleInfo();
+            document.getElementById('week-gauge-info').textContent =
+              `Dia ${cycle.dayNum}/7 | ${data.weekAll.percent}% usado`;
+            document.getElementById('week-gauge-detail').textContent =
+              `${cycle.fmtStart} → ${cycle.fmtEnd} | Reset ${cycle.resetLabel} (${cycle.resetIn})`;
+          }
 
           // Update weekly pace
           updatePace(data.weekAll.percent);
+
+          // Update cycle summary week fields
+          const weekPct = data.weekAll.percent;
+          const riskPct = 100 - weekPct;
+          const weekPctEl = document.getElementById('cycle-week-pct');
+          weekPctEl.textContent = weekPct + '%';
+          weekPctEl.className = 'cycle-item-value ' + (weekPct > 80 ? 'red' : weekPct > 50 ? 'yellow' : 'green');
+          const riskEl = document.getElementById('cycle-risk');
+          riskEl.textContent = riskPct + '%';
+          riskEl.className = 'cycle-item-value ' + (riskPct > 30 ? 'yellow' : riskPct > 10 ? '' : 'green');
+
+          // Update efficiency tab current week
+          updateEfficiencyCurrentWeek(weekPct);
         } else {
           document.getElementById('global-usage-status').textContent = 'Error: ' + (data.error || 'Unknown');
         }
@@ -1534,8 +1767,93 @@
       }
     }
 
+    // Efficiency tab logic
+    function getWeekTokens(blocksData, weekStartISO) {
+      if (!blocksData?.blocks) return 0;
+      return blocksData.blocks
+        .filter(b => !b.isGap && b.startTime >= weekStartISO)
+        .reduce((sum, b) => sum + blockRealTokens(b), 0);
+    }
+
+    function updateEfficiencyCurrentWeek(weekPercent) {
+      const cycle = getWeekCycleInfo();
+      const riskPercent = 100 - weekPercent;
+
+      // Big numbers
+      const usedEl = document.getElementById('eff-used-pct');
+      usedEl.textContent = weekPercent + '%';
+      usedEl.className = 'eff-big-number ' + (weekPercent > 80 ? 'green' : weekPercent > 50 ? 'yellow' : 'red');
+
+      const riskEl = document.getElementById('eff-risk-pct');
+      riskEl.textContent = riskPercent + '%';
+      riskEl.className = 'eff-big-number ' + (riskPercent > 30 ? 'red' : riskPercent > 10 ? 'yellow' : 'green');
+
+      // Bar
+      document.getElementById('eff-bar-used').style.width = weekPercent + '%';
+      document.getElementById('eff-bar-risk').style.width = riskPercent + '%';
+
+      // Day info
+      document.getElementById('eff-day-info').textContent =
+        `Dia ${cycle.dayNum}/7 | ${cycle.fmtStart} → ${cycle.fmtEnd}`;
+
+      // Token details (from cached ccusage + external data)
+      const weekStartISO = cycle.cycleStartISO;
+
+      // We need VPS blocks from the global cached data
+      // Fetch current data to compute week tokens
+      fetch('/api/data').then(r => r.json()).then(data => {
+        const vpsTokens = getWeekTokens(data.blocks, weekStartISO);
+        const extBlocks = getExternalBlocks();
+        const extTokens = extBlocks
+          .filter(b => !b.isGap && b.startTime >= weekStartISO)
+          .reduce((sum, b) => sum + blockRealTokens(b), 0);
+
+        const combined = vpsTokens + extTokens;
+        const estimated = weekPercent > 0 ? Math.round(combined / (weekPercent / 100)) : 0;
+
+        document.getElementById('eff-combined').textContent = formatNumber(combined);
+        document.getElementById('eff-allocation').textContent = estimated > 0 ? '~' + formatNumber(estimated) : '—';
+        document.getElementById('eff-vps').textContent = formatNumber(vpsTokens);
+        document.getElementById('eff-ext').textContent = formatNumber(extTokens);
+      });
+    }
+
+    async function loadWeeklyHistory() {
+      try {
+        const res = await fetch('/api/weekly-history');
+        const data = await res.json();
+        const tbody = document.getElementById('eff-history-body');
+
+        if (!data.history || data.history.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px; color:#52525b;">Sin historial aun (se registra automaticamente)</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.history.map((w, i) => {
+          const pct = w.weekPercent;
+          const barColor = pct > 80 ? '#4ade80' : pct > 50 ? '#fbbf24' : '#f87171';
+          const barWidth = Math.min(pct, 100);
+          const isCurrent = i === 0;
+
+          return `<tr${isCurrent ? ' style="background:rgba(255,255,255,0.03)"' : ''}>
+            <td style="white-space:nowrap;">${w.weekId.slice(5)}${isCurrent ? ' <span style="font-size:0.7em;color:#a78bfa">actual</span>' : ''}</td>
+            <td>${w.dayNum}/7</td>
+            <td>
+              <span class="eff-week-bar" style="width:${barWidth * 0.6}px; background:${barColor};"></span>
+              <span style="color:${barColor}; font-weight:600;">${pct}%</span>
+            </td>
+            <td>${formatNumber(w.combinedTokens)}</td>
+            <td style="color:#71717a;">${w.estimatedAllocation > 0 ? '~' + formatNumber(w.estimatedAllocation) : '—'}</td>
+          </tr>`;
+        }).join('');
+      } catch (e) {
+        console.error('Error loading weekly history:', e);
+      }
+    }
+
     loadData();
     loadGlobalUsage();
+    loadWeeklyHistory();
     setInterval(loadData, 2 * 60 * 1000);
     setInterval(loadGlobalUsage, 5 * 60 * 1000);
   </script>

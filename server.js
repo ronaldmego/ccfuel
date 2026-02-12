@@ -9,6 +9,7 @@ const app = express();
 const PORT = 3400;
 const HOST = '100.64.216.28'; // Tailscale IP
 const EXTERNAL_DIR = path.join(__dirname, 'data', 'external');
+const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
 
 // Cache for global usage (Claude /usage command)
 let globalUsageCache = {
@@ -63,6 +64,111 @@ async function updateCache() {
   }
 }
 
+// Weekly history helpers — uses Claude's actual reset cycle
+function getWeekCycleInfo() {
+  // Use the weekly reset hour from the last global usage fetch
+  const resetHour = globalUsageCache.data?.weekAll?.resetsAtHour ?? 10;
+
+  // Panama time (UTC-5)
+  const now = new Date();
+  const utcMs = now.getTime();
+  const panamaMs = utcMs + (-5 * 60 * 60 * 1000);
+  const panama = new Date(panamaMs);
+
+  // Next reset: today or tomorrow at resetHour
+  let nextReset = new Date(panama);
+  nextReset.setUTCHours(resetHour, 0, 0, 0);
+  if (panama >= nextReset) {
+    nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+  }
+
+  // Cycle start = next reset - 7 days
+  const cycleStart = new Date(nextReset);
+  cycleStart.setUTCDate(cycleStart.getUTCDate() - 7);
+
+  const elapsedMs = panama - cycleStart;
+  const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+  const dayNum = Math.min(Math.ceil(elapsedDays), 7);
+
+  return {
+    dayNum,
+    elapsedDays,
+    cycleStartISO: cycleStart.toISOString(),
+    weekId: cycleStart.toISOString().split('T')[0]
+  };
+}
+
+function getWeekDayNumber() {
+  return getWeekCycleInfo().dayNum;
+}
+
+function getWeekStartDate() {
+  return getWeekCycleInfo().weekId;
+}
+
+function getWeekTokensFromBlocks(blocksData, weekStartISO) {
+  if (!blocksData?.blocks) return 0;
+  return blocksData.blocks
+    .filter(b => !b.isGap && b.startTime >= weekStartISO)
+    .reduce((sum, b) => {
+      const cacheRead = b.tokenCounts?.cacheReadInputTokens || b.cacheReadInputTokens || 0;
+      return sum + ((b.totalTokens || 0) - cacheRead);
+    }, 0);
+}
+
+function saveWeeklySnapshot(weekPercent) {
+  const weekId = getWeekStartDate();
+  const dayNum = getWeekDayNumber();
+  const weekStartISO = weekId + 'T00:00:00.000Z';
+
+  // Combined tokens from VPS + external sources
+  const vpsTokens = getWeekTokensFromBlocks(cachedData.blocks, weekStartISO);
+
+  let extTokens = 0;
+  if (fs.existsSync(EXTERNAL_DIR)) {
+    for (const file of fs.readdirSync(EXTERNAL_DIR).filter(f => f.endsWith('.json'))) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(EXTERNAL_DIR, file), 'utf8'));
+        extTokens += getWeekTokensFromBlocks(data.blocks, weekStartISO);
+      } catch (e) { /* skip corrupt files */ }
+    }
+  }
+
+  const combinedTokens = vpsTokens + extTokens;
+  const estimatedAllocation = weekPercent > 0
+    ? Math.round(combinedTokens / (weekPercent / 100))
+    : 0;
+
+  // Load or create history
+  let history = [];
+  if (fs.existsSync(WEEKLY_HISTORY_FILE)) {
+    try { history = JSON.parse(fs.readFileSync(WEEKLY_HISTORY_FILE, 'utf8')); } catch (e) {}
+  }
+
+  const entry = {
+    weekId,
+    timestamp: new Date().toISOString(),
+    weekPercent,
+    vpsTokens,
+    extTokens,
+    combinedTokens,
+    estimatedAllocation,
+    dayNum
+  };
+
+  const existingIdx = history.findIndex(h => h.weekId === weekId);
+  if (existingIdx >= 0) {
+    history[existingIdx] = entry;
+  } else {
+    history.push(entry);
+  }
+
+  // Keep last 12 weeks
+  history = history.sort((a, b) => b.weekId.localeCompare(a.weekId)).slice(0, 12);
+  fs.writeFileSync(WEEKLY_HISTORY_FILE, JSON.stringify(history, null, 2));
+  console.log(`📊 Weekly snapshot saved: week ${weekId}, ${weekPercent}%, ${(combinedTokens/1e6).toFixed(1)}M tokens`);
+}
+
 // Parse JSON bodies
 app.use(express.json({ limit: '10mb' }));
 
@@ -112,7 +218,14 @@ app.get('/api/global-usage', async (req, res) => {
     globalUsageCache.lastUpdate = new Date().toISOString();
     
     console.log('✅ Global usage updated:', usage.weekAll?.percent + '% week');
-    
+
+    // Auto-snapshot weekly efficiency
+    if (usage.weekAll?.percent != null) {
+      try { saveWeeklySnapshot(usage.weekAll.percent); } catch (e) {
+        console.error('Failed to save weekly snapshot:', e.message);
+      }
+    }
+
     res.json({
       ...usage,
       cached: false
@@ -181,6 +294,15 @@ app.get('/api/external-usage', (req, res) => {
   }
 
   res.json({ sources });
+});
+
+// Weekly History API
+app.get('/api/weekly-history', (req, res) => {
+  let history = [];
+  if (fs.existsSync(WEEKLY_HISTORY_FILE)) {
+    try { history = JSON.parse(fs.readFileSync(WEEKLY_HISTORY_FILE, 'utf8')); } catch (e) {}
+  }
+  res.json({ history });
 });
 
 // Start server
