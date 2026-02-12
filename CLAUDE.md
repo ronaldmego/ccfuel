@@ -115,7 +115,9 @@ token-dashboard/
 ├── scripts/
 │   └── push-usage.sh   # Sync laptop → VPS (hook + cron)
 ├── data/
-│   └── external/       # Datos externos (laptop.json, etc)
+│   ├── external/       # Datos externos (laptop.json, etc)
+│   ├── weekly-history.json  # Snapshots de eficiencia semanal
+│   └── usage-curve.json     # Snapshots periodicos de % (cada 5 min)
 ├── CLAUDE.md           # Este archivo
 ├── TECHNICAL-NOTES.md  # Metodologia: gasolina real, que medimos, que ignoramos
 ├── LOCALSETUP.md       # Setup laptop: hooks, Task Scheduler, sync
@@ -134,15 +136,20 @@ token-dashboard/
 | `/api/global-usage/refresh` | GET | Fuerza refresh de global usage |
 | `/api/external-usage` | POST | Recibe datos de fuentes externas (laptop) |
 | `/api/external-usage` | GET | Lista datos de todas las fuentes externas |
+| `/api/usage-curve` | GET | Snapshots periodicos de % (para comparacion semanal) |
 | `/api/weekly-history` | GET | Historial de eficiencia semanal |
 
 **Global Usage:** Ejecuta Claude Code via PTY (~15-20s), cache 5 min. Retorna session%, weekAll%, weekSonnet%, extraUsage.
 
 **Cache:** Datos en memoria, auto-refresh cada 5 min, `/api/refresh` fuerza actualizacion.
 
+**Usage Curve:** Cada fetch exitoso de global-usage guarda un snapshot en `data/usage-curve.json` (%, hora, dia del ciclo). Poda automatica: ultimos 28 dias.
+
 ### Metricas del Dashboard
 
-**Tab Overview:** Uso global real (% semanal), pace semanal, proyeccion de agotamiento, sesion actual, gasolina semanal (tokens reales), promedio diario, gasolina hoy. Charts de uso diario y por franja horaria (solo tokens reales, sin cache reads).
+**Tab Overview:** Uso global real (% semanal), pace semanal, proyeccion de agotamiento, sesion actual, barra de ciclo (dias restantes + tokens ciclo), gasolina hoy, promedio diario. Charts de uso diario y por franja horaria (solo tokens reales, sin cache reads).
+
+**Tab Patrones:** Heatmap de actividad semanal (7 dias x 24 horas, CSS grid), comparacion de consumo semana actual vs anterior (Chart.js line chart, tokens acumulados).
 
 **Tab Eficiencia:** Eficiencia semanal actual (% usado vs disponible), historial de semanas anteriores, tokens combinados VPS+Laptop.
 

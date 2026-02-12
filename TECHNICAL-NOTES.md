@@ -237,6 +237,64 @@ El `weekId` es la fecha de inicio del ciclo (no el dia de la semana tradicional)
 
 ---
 
+## Tab Patrones: Heatmap y Comparacion Semanal
+
+### Heatmap de Actividad (CSS Grid)
+
+Renderizado como HTML/CSS grid (no Chart.js matrix — ese plugin no alineaba las celdas correctamente). Cada celda representa 1 hora de 1 dia del ciclo semanal.
+
+**Funcion:** `buildHeatmapMatrix(allBlocks, cycleStartISO)` → matriz 7x24
+
+**Logica por bloque:**
+1. Convertir `block.startTime` a hora Panama via `getPanamaDate()`
+2. Calcular dia del ciclo: `floor((blockPanama - cycleStartPanama) / 1 dia)` → 0-6
+3. Extraer hora: `blockPanama.getUTCHours()` → 0-23
+4. Sumar `blockRealTokens(block)` a `matrix[day][hour]`
+
+**Colores:** Verde (#4ade80) con alpha proporcional a `val / maxVal`. Celdas sin actividad: gris minimo. Dias futuros: casi invisible.
+
+**Combina:** VPS + laptop (todos los bloques mezclados antes de construir la matriz).
+
+### Comparacion Semana Actual vs Anterior
+
+Chart.js line chart con tokens **acumulados** por hora del ciclo.
+
+**Funcion:** `computeWeeklyCurve(allBlocks, weekStartISO, weekEndISO)` → array de 168 valores
+
+**Logica:**
+1. Crear 168 buckets (7 dias x 24h), cada uno = tokens de esa hora
+2. Filtrar bloques en el rango [weekStartISO, weekEndISO)
+3. Asignar cada bloque al bucket correspondiente segun hora transcurrida desde weekStart
+4. Convertir a acumulado (cada bucket = suma de todos los anteriores + propio)
+
+**Semana anterior:** Se calcula `prevStart = cycleStart - 7 dias`. Si no hay datos previos, solo muestra curva actual con mensaje "Primera semana registrada".
+
+**Summary:** Muestra comparacion textual al punto actual: "A las Xh: Y esta semana vs Z anterior (+/-N%)"
+
+### Snapshots de Curva de Uso
+
+Archivo `data/usage-curve.json` con snapshots periodicos del % global.
+
+**Trigger:** Cada fetch exitoso de `/api/global-usage` (cada ~5 min). Despues de `saveWeeklySnapshot()`.
+
+**Estructura por snapshot:**
+```json
+{
+  "timestamp": "ISO datetime",
+  "weekId": "YYYY-MM-DD (inicio del ciclo)",
+  "weekPercent": 8,
+  "sessionPercent": 60,
+  "elapsedHours": 6.5,
+  "dayNum": 1
+}
+```
+
+**Poda:** Elimina entries con timestamp > 28 dias.
+
+**Uso futuro:** Graficari curva de % a lo largo de la semana, comparar perfil de uso vs semana anterior a nivel de porcentaje (complementa la comparacion de tokens).
+
+---
+
 ## Que NO Capturamos
 
 | Fuente | Visible | Razon |

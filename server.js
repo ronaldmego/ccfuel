@@ -10,6 +10,7 @@ const PORT = 3400;
 const HOST = '100.64.216.28'; // Tailscale IP
 const EXTERNAL_DIR = path.join(__dirname, 'data', 'external');
 const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
+const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');
 
 // Cache for global usage (Claude /usage command)
 let globalUsageCache = {
@@ -17,6 +18,32 @@ let globalUsageCache = {
   lastUpdate: null,
   fetching: false
 };
+
+// Persisted reset dates — PTY parsing is unreliable, so we keep the last
+// successfully parsed resetsAt values and reuse them when parsing fails.
+const RESETS_CACHE_FILE = path.join(__dirname, 'data', 'resets-cache.json');
+let persistedResets = { session: null, weekAll: null, weekSonnet: null };
+try {
+  if (fs.existsSync(RESETS_CACHE_FILE)) {
+    persistedResets = JSON.parse(fs.readFileSync(RESETS_CACHE_FILE, 'utf8'));
+  }
+} catch (e) { /* ignore */ }
+
+function updatePersistedResets(usage) {
+  let changed = false;
+  for (const key of ['session', 'weekAll', 'weekSonnet']) {
+    if (usage[key]?.resetsAt) {
+      persistedResets[key] = usage[key].resetsAt;
+      changed = true;
+    } else if (persistedResets[key] && new Date(persistedResets[key]) > new Date()) {
+      // PTY failed to parse, but persisted value is still in the future — inject it
+      if (usage[key]) usage[key].resetsAt = persistedResets[key];
+    }
+  }
+  if (changed) {
+    try { fs.writeFileSync(RESETS_CACHE_FILE, JSON.stringify(persistedResets, null, 2)); } catch (e) { /* ignore */ }
+  }
+}
 
 // Cache for ccusage data
 let cachedData = {
@@ -66,20 +93,25 @@ async function updateCache() {
 
 // Weekly history helpers — uses Claude's actual reset cycle
 function getWeekCycleInfo() {
-  // Use the weekly reset hour from the last global usage fetch
-  const resetHour = globalUsageCache.data?.weekAll?.resetsAtHour ?? 10;
-
   // Panama time (UTC-5)
   const now = new Date();
-  const utcMs = now.getTime();
-  const panamaMs = utcMs + (-5 * 60 * 60 * 1000);
+  const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
   const panama = new Date(panamaMs);
 
-  // Next reset: today or tomorrow at resetHour
-  let nextReset = new Date(panama);
-  nextReset.setUTCHours(resetHour, 0, 0, 0);
-  if (panama >= nextReset) {
-    nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+  let nextReset;
+  const weeklyResetsAt = globalUsageCache.data?.weekAll?.resetsAt;
+
+  if (weeklyResetsAt) {
+    // Use actual reset date from Claude /usage (convert UTC to panama-shifted)
+    nextReset = new Date(new Date(weeklyResetsAt).getTime() + (-5 * 60 * 60 * 1000));
+  } else {
+    // Fallback: estimate using reset hour (only accurate on day before reset)
+    const resetHour = globalUsageCache.data?.weekAll?.resetsAtHour ?? 10;
+    nextReset = new Date(panama);
+    nextReset.setUTCHours(resetHour, 0, 0, 0);
+    if (panama >= nextReset) {
+      nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+    }
   }
 
   // Cycle start = next reset - 7 days
@@ -158,6 +190,13 @@ function saveWeeklySnapshot(weekPercent) {
 
   const existingIdx = history.findIndex(h => h.weekId === weekId);
   if (existingIdx >= 0) {
+    const existing = history[existingIdx];
+    // Never downgrade weekPercent — protects against post-reset overwrites
+    // After a weekly reset, Claude returns 0-2% but weekId may still point to the old week
+    if (weekPercent < existing.weekPercent) {
+      console.log(`📊 Weekly snapshot SKIPPED: week ${weekId}, ${weekPercent}% < existing ${existing.weekPercent}% (protecting closing value)`);
+      return;
+    }
     history[existingIdx] = entry;
   } else {
     history.push(entry);
@@ -167,6 +206,40 @@ function saveWeeklySnapshot(weekPercent) {
   history = history.sort((a, b) => b.weekId.localeCompare(a.weekId)).slice(0, 12);
   fs.writeFileSync(WEEKLY_HISTORY_FILE, JSON.stringify(history, null, 2));
   console.log(`📊 Weekly snapshot saved: week ${weekId}, ${weekPercent}%, ${(combinedTokens/1e6).toFixed(1)}M tokens`);
+}
+
+function saveUsageCurveSnapshot(usage) {
+  if (!usage?.weekAll?.percent == null) return;
+
+  const weekPercent = usage.weekAll.percent;
+  const sessionPercent = usage.session?.percent ?? null;
+  const cycleInfo = getWeekCycleInfo();
+
+  const snapshot = {
+    timestamp: new Date().toISOString(),
+    weekId: cycleInfo.weekId,
+    weekPercent,
+    sessionPercent,
+    elapsedHours: Math.round(cycleInfo.elapsedDays * 24 * 100) / 100,
+    dayNum: cycleInfo.dayNum
+  };
+
+  let data = { snapshots: [] };
+  try {
+    if (fs.existsSync(USAGE_CURVE_FILE)) {
+      data = JSON.parse(fs.readFileSync(USAGE_CURVE_FILE, 'utf8'));
+    }
+  } catch (e) { /* start fresh */ }
+
+  data.snapshots.push(snapshot);
+
+  // Prune: keep last 28 days only
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 28);
+  data.snapshots = data.snapshots.filter(s => new Date(s.timestamp) >= cutoff);
+
+  fs.writeFileSync(USAGE_CURVE_FILE, JSON.stringify(data, null, 2));
+  console.log(`📈 Usage curve snapshot: ${weekPercent}% week, ${sessionPercent}% session, day ${cycleInfo.dayNum}`);
 }
 
 // Parse JSON bodies
@@ -214,15 +287,20 @@ app.get('/api/global-usage', async (req, res) => {
     console.log('🔄 Fetching global usage from Claude...');
     
     const usage = await getClaudeUsage(false);
+    updatePersistedResets(usage);
     globalUsageCache.data = usage;
     globalUsageCache.lastUpdate = new Date().toISOString();
-    
-    console.log('✅ Global usage updated:', usage.weekAll?.percent + '% week');
+
+    console.log('✅ Global usage updated:', usage.weekAll?.percent + '% week',
+      usage.weekAll?.resetsAt ? '(resetsAt: ' + usage.weekAll.resetsAt + ')' : '(resetsAt: persisted)');
 
     // Auto-snapshot weekly efficiency
     if (usage.weekAll?.percent != null) {
       try { saveWeeklySnapshot(usage.weekAll.percent); } catch (e) {
         console.error('Failed to save weekly snapshot:', e.message);
+      }
+      try { saveUsageCurveSnapshot(usage); } catch (e) {
+        console.error('Failed to save usage curve snapshot:', e.message);
       }
     }
 
@@ -294,6 +372,15 @@ app.get('/api/external-usage', (req, res) => {
   }
 
   res.json({ sources });
+});
+
+// Usage Curve API (periodic % snapshots for week-over-week comparison)
+app.get('/api/usage-curve', (req, res) => {
+  let data = { snapshots: [] };
+  if (fs.existsSync(USAGE_CURVE_FILE)) {
+    try { data = JSON.parse(fs.readFileSync(USAGE_CURVE_FILE, 'utf8')); } catch (e) {}
+  }
+  res.json(data);
 });
 
 // Weekly History API

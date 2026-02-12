@@ -607,7 +607,7 @@
     /* Cycle Summary (compact row in header area) */
     .cycle-summary {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 12px;
       margin-bottom: 24px;
       padding: 16px;
@@ -616,12 +616,8 @@
       border-radius: 12px;
     }
 
-    @media (max-width: 900px) {
-      .cycle-summary { grid-template-columns: repeat(3, 1fr); }
-    }
-
     @media (max-width: 500px) {
-      .cycle-summary { grid-template-columns: repeat(2, 1fr); }
+      .cycle-summary { grid-template-columns: 1fr; }
     }
 
     .cycle-item {
@@ -790,6 +786,138 @@
       vertical-align: middle;
     }
 
+    /* Patterns tab */
+    .pattern-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .pattern-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .pattern-card-title {
+      font-size: 0.95em;
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+
+    .pattern-card-subtitle {
+      font-size: 0.75em;
+      color: #52525b;
+      margin-bottom: 16px;
+    }
+
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: 52px repeat(24, 1fr);
+      gap: 2px;
+      margin-bottom: 8px;
+    }
+
+    .heatmap-hour-labels {
+      display: contents;
+    }
+
+    .heatmap-hour-label {
+      font-size: 0.65em;
+      color: #52525b;
+      text-align: center;
+      padding-bottom: 2px;
+    }
+
+    .heatmap-row-label {
+      font-size: 0.7em;
+      color: #71717a;
+      display: flex;
+      align-items: center;
+      padding-right: 4px;
+      white-space: nowrap;
+    }
+
+    .heatmap-cell {
+      aspect-ratio: 1.6;
+      min-height: 16px;
+      border-radius: 3px;
+      transition: opacity 0.2s;
+      position: relative;
+    }
+
+    .heatmap-cell:hover {
+      outline: 1px solid rgba(255,255,255,0.3);
+      z-index: 1;
+    }
+
+    .heatmap-cell[data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f1f28;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #e4e4e7;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 4px;
+      font-size: 0.72em;
+      color: #52525b;
+    }
+
+    .heatmap-legend-gradient {
+      width: 120px;
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, rgba(74,222,128,0.08), rgba(74,222,128,1));
+    }
+
+    .comparison-wrapper {
+      height: 280px;
+      position: relative;
+    }
+
+    .comparison-wrapper canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .comparison-summary {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      font-size: 0.8em;
+      color: #71717a;
+    }
+
+    .comparison-summary strong {
+      color: #e4e4e7;
+    }
+
+    .pattern-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #52525b;
+      font-size: 0.9em;
+    }
+
     /* Footer */
     .footer {
       text-align: center;
@@ -838,6 +966,10 @@
         <span class="tab-icon">📈</span>
         <span>Overview</span>
       </button>
+      <button class="tab" data-tab="patrones">
+        <span class="tab-icon">🔥</span>
+        <span>Patrones</span>
+      </button>
       <button class="tab" data-tab="eficiencia">
         <span class="tab-icon">🎯</span>
         <span>Eficiencia</span>
@@ -861,6 +993,7 @@
               <div class="global-usage-fill" id="global-session-bar" style="width: 0%"></div>
             </div>
             <div class="global-usage-value" id="global-session">—%</div>
+            <div class="global-usage-reset" id="global-session-reset" style="font-size:0.7em;color:#71717a;margin-top:2px;"></div>
           </div>
           <div class="global-usage-item">
             <div class="global-usage-label">Semana (Todos)</div>
@@ -868,6 +1001,7 @@
               <div class="global-usage-fill" id="global-week-bar" style="width: 0%"></div>
             </div>
             <div class="global-usage-value" id="global-week">—%</div>
+            <div class="global-usage-reset" id="global-week-reset" style="font-size:0.7em;color:#71717a;margin-top:2px;"></div>
           </div>
           <div class="global-usage-item">
             <div class="global-usage-label">Semana (Sonnet)</div>
@@ -875,6 +1009,7 @@
               <div class="global-usage-fill sonnet" id="global-sonnet-bar" style="width: 0%"></div>
             </div>
             <div class="global-usage-value" id="global-sonnet">—%</div>
+            <div class="global-usage-reset" id="global-sonnet-reset" style="font-size:0.7em;color:#71717a;margin-top:2px;"></div>
           </div>
           <div class="global-usage-item extra" id="global-extra-container" style="display:none;">
             <div class="global-usage-label">Extra Usage</div>
@@ -912,22 +1047,6 @@
         <div class="cycle-item">
           <div class="cycle-item-value" id="cycle-tokens">—</div>
           <div class="cycle-item-label">Tokens Ciclo</div>
-        </div>
-        <div class="cycle-item">
-          <div class="cycle-item-value" id="cycle-cost">—</div>
-          <div class="cycle-item-label">Costo Equiv.</div>
-        </div>
-        <div class="cycle-item">
-          <div class="cycle-item-value" id="cycle-week-pct">—</div>
-          <div class="cycle-item-label">% Semanal</div>
-        </div>
-        <div class="cycle-item">
-          <div class="cycle-item-value" id="cycle-risk">—</div>
-          <div class="cycle-item-label">En Riesgo</div>
-        </div>
-        <div class="cycle-item">
-          <div class="cycle-item-value" id="cycle-pace">—</div>
-          <div class="cycle-item-label">Pace</div>
         </div>
       </div>
 
@@ -1084,6 +1203,39 @@
       </div>
     </div>
 
+    <!-- Tab: Patrones -->
+    <div class="tab-content" id="tab-patrones">
+      <!-- Heatmap -->
+      <div class="pattern-card">
+        <div class="pattern-card-header">
+          <span class="pattern-card-title">🔥 Mapa de Actividad Semanal</span>
+        </div>
+        <div class="pattern-card-subtitle">Intensidad de uso por dia y hora del ciclo actual</div>
+        <div id="heatmap-container">
+          <div id="heatmap-grid" class="heatmap-grid"></div>
+          <div class="heatmap-legend">
+            <span>Menos</span>
+            <div class="heatmap-legend-gradient"></div>
+            <span>Mas</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Week Comparison -->
+      <div class="pattern-card">
+        <div class="pattern-card-header">
+          <span class="pattern-card-title">📊 Consumo: Esta Semana vs Anterior</span>
+        </div>
+        <div class="pattern-card-subtitle">Tokens reales acumulados por hora del ciclo</div>
+        <div id="comparison-container">
+          <div class="comparison-wrapper">
+            <canvas id="comparisonChart"></canvas>
+          </div>
+          <div class="comparison-summary" id="comparison-summary"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
       Ultima actualizacion: <span id="last-update">—</span>
@@ -1095,6 +1247,7 @@
     let hourlyChart = null;
     let externalData = null; // { sources: { laptop: { blocks, daily, lastUpdate } } }
     let weeklyResetHour = null; // Hour (0-23) when Claude's week resets, from /usage
+    let weeklyResetsAt = null;  // Full ISO datetime of next weekly reset, from /usage
 
     const PANAMA_OFFSET = -5;
 
@@ -1105,6 +1258,8 @@
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        // Re-render patterns charts when tab becomes visible (Chart.js needs visible container)
+        if (tab.dataset.tab === 'patrones') loadPatternsTab();
       });
     });
 
@@ -1170,9 +1325,7 @@
       const activeBlocks = cycleBlocks.filter(b => !b.isGap);
 
       const cycleTokens = activeBlocks.reduce((sum, b) => sum + blockRealTokens(b), 0);
-      const cycleCost = activeBlocks.reduce((sum, b) => sum + b.costUSD, 0);
-
-      return { cycleStart, cycleEnd, daysLeft, cycleTokens, cycleCost };
+      return { cycleStart, cycleEnd, daysLeft, cycleTokens };
     }
 
     function getLocalHour(utcDateStr) {
@@ -1246,8 +1399,7 @@
       const extBlocks = getExternalBlocks();
       const cycleBlocks = extBlocks.filter(b => !b.isGap && isInCurrentCycle(b.startTime));
       const tokens = cycleBlocks.reduce((sum, b) => sum + blockRealTokens(b), 0);
-      const cost = cycleBlocks.reduce((sum, b) => sum + (b.costUSD || 0), 0);
-      return { tokens, cost };
+      return { tokens };
     }
 
     async function loadData() {
@@ -1307,13 +1459,10 @@
         document.getElementById('cycle-days-left').textContent = `${cycleStats.daysLeft}d`;
         const extStats = getExternalCycleStats();
         const totalCycleTokens = cycleStats.cycleTokens + extStats.tokens;
-        const totalCycleCost = cycleStats.cycleCost + extStats.cost;
         const hasExternal = extStats.tokens > 0;
 
         document.getElementById('cycle-tokens').innerHTML = formatNumber(totalCycleTokens) +
           (hasExternal ? ` <span style="font-size:0.6em;color:#71717a">(VPS ${formatNumber(cycleStats.cycleTokens)} + Ext ${formatNumber(extStats.tokens)})</span>` : '');
-        document.getElementById('cycle-cost').innerHTML = `$${totalCycleCost.toFixed(0)}` +
-          (hasExternal ? ` <span style="font-size:0.6em;color:#71717a">($${cycleStats.cycleCost.toFixed(0)}+$${extStats.cost.toFixed(0)})</span>` : '');
         // Charts
         const dailyData = data.daily.daily.slice(-14);
         const hourlyData = aggregateByHour(blocks);
@@ -1483,21 +1632,28 @@
       await loadData();
     }
 
-    // Weekly cycle calculation based on Claude's actual reset time
-    // Claude resets every 7 days at a specific hour (e.g. 10am Panama).
-    // We compute: next reset, cycle start, days elapsed, days remaining.
+    // Weekly cycle calculation based on Claude's actual reset date+time.
+    // Uses resetsAt (full ISO datetime) from /usage when available.
+    // Fallback: hour-based estimate (only accurate near end of cycle).
     function getWeekCycleInfo() {
-      // Use direct UTC-5 offset (same approach as server.js)
       const panama = getPanamaDate();
 
-      const resetHour = weeklyResetHour ?? 10; // default 10am if not loaded yet
+      let nextReset;
+      let resetHour;
 
-      // Next reset: today or tomorrow at resetHour Panama time
-      // We work in UTC on the panama-shifted Date object
-      let nextReset = new Date(panama);
-      nextReset.setUTCHours(resetHour, 0, 0, 0);
-      if (panama >= nextReset) {
-        nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+      if (weeklyResetsAt) {
+        // Use actual reset date from Claude /usage (convert UTC to panama-shifted)
+        const resetUTC = new Date(weeklyResetsAt);
+        nextReset = new Date(resetUTC.getTime() + (-5 * 60 * 60 * 1000));
+        resetHour = nextReset.getUTCHours();
+      } else {
+        // Fallback: estimate using reset hour
+        resetHour = weeklyResetHour ?? 10;
+        nextReset = new Date(panama);
+        nextReset.setUTCHours(resetHour, 0, 0, 0);
+        if (panama >= nextReset) {
+          nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+        }
       }
 
       // Hours until next reset
@@ -1518,14 +1674,23 @@
       // Format dates for display using UTC methods on panama-shifted dates
       const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
       const fmt = d => `${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
+      const days = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+      const fmtReset = d => {
+        const dayName = days[d.getUTCDay()];
+        const h = d.getUTCHours();
+        const hLabel = h > 12 ? (h - 12) + 'pm' : h === 12 ? '12pm' : h === 0 ? '12am' : h + 'am';
+        return `${dayName} ${d.getUTCDate()} ${months[d.getUTCMonth()]} ${hLabel}`;
+      };
 
-      // Next reset display
-      const resetLabel = resetHour > 12 ? (resetHour - 12) + 'pm' :
-                        resetHour === 12 ? '12pm' :
-                        resetHour === 0 ? '12am' : resetHour + 'am';
+      // Countdown display
       const h = Math.floor(hoursUntilReset);
       const m = Math.round((hoursUntilReset - h) * 60);
       const resetIn = `${h}h ${m}m`;
+
+      // Simple hour label for backward compat
+      const resetLabel = resetHour > 12 ? (resetHour - 12) + 'pm' :
+                        resetHour === 12 ? '12pm' :
+                        resetHour === 0 ? '12am' : resetHour + 'am';
 
       // ISO string of cycle start for filtering blocks
       const cycleStartISO = cycleStart.toISOString().split('T')[0] + `T${String(resetHour).padStart(2,'0')}:00:00`;
@@ -1540,6 +1705,7 @@
         resetHour,
         resetLabel,
         resetIn,
+        resetDateLabel: fmtReset(nextReset), // "jue 19 feb 10am"
         fmtStart: fmt(cycleStart),
         fmtEnd: fmt(nextReset)
       };
@@ -1607,10 +1773,6 @@
           `Llegas al reset con <strong style="color:#4ade80">${Math.round(100 - projected)}%</strong> de margen`;
       }
 
-      // Update cycle-pace in summary row
-      const paceEl = document.getElementById('cycle-pace');
-      paceEl.textContent = status;
-      paceEl.className = 'cycle-item-value ' + (statusClass === 'on-track' ? 'green' : statusClass === 'accelerated' ? 'yellow' : 'red');
     }
 
     // Fuel gauge helper
@@ -1634,33 +1796,39 @@
       if (label) label.setAttribute('fill', '#71717a');
     }
 
+    // Format a resetsAt ISO string into a human-readable countdown
+    function formatResetCountdown(resetsAtISO) {
+      if (!resetsAtISO) return null;
+      const resetUTC = new Date(resetsAtISO);
+      const now = new Date();
+      const diffMs = resetUTC - now;
+      if (diffMs <= 0) return null;
+      const totalMin = Math.floor(diffMs / 60000);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      // Format the reset time in Panama
+      const resetPanama = new Date(resetUTC.getTime() + (-5 * 60 * 60 * 1000));
+      const rh = resetPanama.getUTCHours();
+      const rm = resetPanama.getUTCMinutes();
+      const timeLabel = (rh > 12 ? (rh - 12) : rh === 0 ? 12 : rh) + ':' +
+        String(rm).padStart(2, '0') + (rh >= 12 ? 'pm' : 'am');
+      // Full date label (e.g., "feb 19, 9:59am") for resets > 24h away
+      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      const dateLabel = `${months[resetPanama.getUTCMonth()]} ${resetPanama.getUTCDate()}, ${timeLabel}`;
+      return { h, m, timeLabel, dateLabel, isMultiDay: h >= 24 };
+    }
+
     // Update session gauge with real data from /usage
     function updateSessionCard(session) {
       const percent = session.percent;
       const remaining = 100 - percent;
-      const resetsAtHour = session.resetsAtHour;
 
       updateGauge('session-gauge-arc', 'session-gauge-val', 'session-gauge-label', remaining);
 
-      if (resetsAtHour !== null && resetsAtHour !== undefined) {
-        const now = new Date();
-        const utcNow = now.getTime();
-        const panamaOffset = -5 * 60 * 60 * 1000;
-        const panamaMs = utcNow + panamaOffset;
-        const panamaDate = new Date(panamaMs);
-        const panamaHour = panamaDate.getUTCHours();
-
-        let hoursUntil = resetsAtHour - panamaHour;
-        if (hoursUntil <= 0) hoursUntil += 24;
-
-        const resetLabel = resetsAtHour > 12 ? (resetsAtHour - 12) + 'pm' :
-                          resetsAtHour === 12 ? '12pm' :
-                          resetsAtHour === 0 ? '12am' : resetsAtHour + 'am';
-
-        const h = Math.floor(hoursUntil);
-        const m = Math.round((hoursUntil - h) * 60);
+      const countdown = formatResetCountdown(session.resetsAt);
+      if (countdown) {
         document.getElementById('session-gauge-info').textContent =
-          `Reset ${resetLabel} (${h}h ${m}m) | ${percent}% usado`;
+          `Reset ${countdown.timeLabel} (${countdown.h}h ${countdown.m}m) | ${percent}% usado`;
       } else {
         document.getElementById('session-gauge-info').textContent = percent + '% usado';
       }
@@ -1675,7 +1843,7 @@
         const res = await fetch('/api/global-usage');
         const data = await res.json();
 
-        if (data.success) {
+        if (data.session && data.weekAll) {
           // Update values
           document.getElementById('global-session').textContent = data.session.percent + '%';
           document.getElementById('global-week').textContent = data.weekAll.percent + '%';
@@ -1685,6 +1853,18 @@
           document.getElementById('global-session-bar').style.width = data.session.percent + '%';
           document.getElementById('global-week-bar').style.width = data.weekAll.percent + '%';
           document.getElementById('global-sonnet-bar').style.width = data.weekSonnet.percent + '%';
+
+          // Show reset countdowns under each section
+          for (const [key, elId] of [['session', 'global-session-reset'], ['weekAll', 'global-week-reset'], ['weekSonnet', 'global-sonnet-reset']]) {
+            const cd = formatResetCountdown(data[key]?.resetsAt);
+            const el = document.getElementById(elId);
+            if (cd) {
+              const label = cd.isMultiDay ? cd.dateLabel : cd.timeLabel;
+              el.textContent = `Reset: ${label} (${cd.h}h ${cd.m}m)`;
+            } else {
+              el.textContent = '';
+            }
+          }
 
           // Color bars based on usage
           const weekBar = document.getElementById('global-week-bar');
@@ -1710,7 +1890,10 @@
           const cacheNote = data.cached ? ` (cache ${data.cacheAge}m)` : ' (fresh)';
           statusEl.textContent = 'Actualizado: ' + new Date(data.timestamp).toLocaleTimeString('es-PA') + cacheNote;
 
-          // Store weekly reset hour for cycle calculations
+          // Store weekly reset info for cycle calculations
+          if (data.weekAll.resetsAt != null) {
+            weeklyResetsAt = data.weekAll.resetsAt;
+          }
           if (data.weekAll.resetsAtHour != null) {
             weeklyResetHour = data.weekAll.resetsAtHour;
           }
@@ -1726,23 +1909,14 @@
             document.getElementById('week-gauge-info').textContent =
               `Dia ${cycle.dayNum}/7 | ${data.weekAll.percent}% usado`;
             document.getElementById('week-gauge-detail').textContent =
-              `${cycle.fmtStart} → ${cycle.fmtEnd} | Reset ${cycle.resetLabel} (${cycle.resetIn})`;
+              `${cycle.fmtStart} → ${cycle.fmtEnd} | Reset: ${cycle.resetDateLabel} (${cycle.resetIn})`;
           }
 
           // Update weekly pace
           updatePace(data.weekAll.percent);
 
-          // Update cycle summary week fields
-          const weekPct = data.weekAll.percent;
-          const riskPct = 100 - weekPct;
-          const weekPctEl = document.getElementById('cycle-week-pct');
-          weekPctEl.textContent = weekPct + '%';
-          weekPctEl.className = 'cycle-item-value ' + (weekPct > 80 ? 'red' : weekPct > 50 ? 'yellow' : 'green');
-          const riskEl = document.getElementById('cycle-risk');
-          riskEl.textContent = riskPct + '%';
-          riskEl.className = 'cycle-item-value ' + (riskPct > 30 ? 'yellow' : riskPct > 10 ? '' : 'green');
-
           // Update efficiency tab current week
+          const weekPct = data.weekAll.percent;
           updateEfficiencyCurrentWeek(weekPct);
         } else {
           document.getElementById('global-usage-status').textContent = 'Error: ' + (data.error || 'Unknown');
@@ -1794,7 +1968,7 @@
 
       // Day info
       document.getElementById('eff-day-info').textContent =
-        `Dia ${cycle.dayNum}/7 | ${cycle.fmtStart} → ${cycle.fmtEnd}`;
+        `Dia ${cycle.dayNum}/7 | ${cycle.fmtStart} → ${cycle.fmtEnd} | Reset: ${cycle.resetDateLabel}`;
 
       // Token details (from cached ccusage + external data)
       const weekStartISO = cycle.cycleStartISO;
@@ -1851,11 +2025,271 @@
       }
     }
 
+    // === Patterns Tab ===
+    let comparisonChart = null;
+
+    // Build 7x24 matrix of real tokens for the current weekly cycle
+    function buildHeatmapMatrix(allBlocks, cycleStartISO) {
+      const matrix = Array.from({length: 7}, () => new Array(24).fill(0));
+
+      allBlocks.filter(b => !b.isGap && b.startTime >= cycleStartISO).forEach(block => {
+        const blockPanama = getPanamaDate(new Date(block.startTime));
+        const cycleStartPanama = getPanamaDate(new Date(cycleStartISO));
+        const diffMs = blockPanama - cycleStartPanama;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        const day = Math.min(Math.floor(diffDays), 6);
+        if (day < 0) return;
+        const hour = blockPanama.getUTCHours();
+        matrix[day][hour] += blockRealTokens(block);
+      });
+
+      return matrix;
+    }
+
+    function renderHeatmap(allBlocks, cycle) {
+      const matrix = buildHeatmapMatrix(allBlocks, cycle.cycleStartISO);
+      const grid = document.getElementById('heatmap-grid');
+
+      const hasData = matrix.some(row => row.some(v => v > 0));
+      if (!hasData) {
+        grid.innerHTML = '';
+        grid.style.display = 'none';
+        grid.parentElement.querySelector('.heatmap-legend').style.display = 'none';
+        grid.insertAdjacentHTML('afterend', '<div class="pattern-empty">Sin actividad esta semana</div>');
+        return;
+      }
+
+      const maxVal = Math.max(...matrix.flat(), 1);
+      const dayNames = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+      const cycleStartDate = getPanamaDate(new Date(cycle.cycleStartISO));
+
+      let html = '';
+
+      // Hour labels row (first cell is empty spacer for row labels)
+      html += '<div class="heatmap-row-label"></div>';
+      for (let h = 0; h < 24; h++) {
+        html += `<div class="heatmap-hour-label">${h % 3 === 0 ? h : ''}</div>`;
+      }
+
+      // Data rows
+      for (let d = 0; d < 7; d++) {
+        const dt = new Date(cycleStartDate.getTime() + d * 24 * 60 * 60 * 1000);
+        const dowName = dayNames[dt.getUTCDay()];
+        const label = `D${d+1} ${dowName}`;
+        const isFuture = d >= cycle.dayNum;
+
+        html += `<div class="heatmap-row-label">${label}</div>`;
+        for (let h = 0; h < 24; h++) {
+          const val = matrix[d][h];
+          let bg;
+          if (isFuture) {
+            bg = 'rgba(255,255,255,0.015)';
+          } else if (val === 0) {
+            bg = 'rgba(255,255,255,0.04)';
+          } else {
+            const intensity = Math.min(val / maxVal, 1);
+            const alpha = 0.15 + intensity * 0.85;
+            bg = `rgba(74,222,128,${alpha})`;
+          }
+          const tip = isFuture ? '' : `data-tip="${label} ${String(h).padStart(2,'0')}h: ${formatNumber(val)}"`;
+          html += `<div class="heatmap-cell" style="background:${bg}" ${tip}></div>`;
+        }
+      }
+
+      grid.style.display = '';
+      grid.innerHTML = html;
+    }
+
+    // Compute accumulated token curve: array of { hour, tokens } for a given week
+    function computeWeeklyCurve(allBlocks, weekStartISO, weekEndISO) {
+      // 168 hours in a week, accumulate tokens per hour bucket
+      const buckets = new Array(168).fill(0);
+
+      allBlocks.filter(b => !b.isGap && b.startTime >= weekStartISO && b.startTime < weekEndISO).forEach(block => {
+        const blockPanama = getPanamaDate(new Date(block.startTime));
+        const startPanama = getPanamaDate(new Date(weekStartISO));
+        const diffHours = (blockPanama - startPanama) / (1000 * 60 * 60);
+        const bucket = Math.min(Math.floor(diffHours), 167);
+        if (bucket >= 0) buckets[bucket] += blockRealTokens(block);
+      });
+
+      // Convert to cumulative
+      const cumulative = [];
+      let sum = 0;
+      for (let i = 0; i < 168; i++) {
+        sum += buckets[i];
+        cumulative.push(sum);
+      }
+      return cumulative;
+    }
+
+    function renderComparison(allBlocks, cycle) {
+      // Current week curve
+      const currentEnd = new Date(cycle.nextReset).toISOString();
+      const currentCurve = computeWeeklyCurve(allBlocks, cycle.cycleStartISO, currentEnd);
+
+      // Previous week: cycleStart - 7d to cycleStart
+      const prevStart = new Date(new Date(cycle.cycleStartISO).getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const prevCurve = computeWeeklyCurve(allBlocks, prevStart, cycle.cycleStartISO);
+
+      const hasPrev = prevCurve[prevCurve.length - 1] > 0;
+
+      // Current elapsed hours (only show data up to now)
+      const elapsedHours = Math.min(Math.floor(cycle.elapsedDays * 24), 168);
+
+      // Labels: D1 0h, D1 6h, ..., D7 18h (show every 6h)
+      const labels = Array.from({length: 168}, (_, i) => {
+        const d = Math.floor(i / 24) + 1;
+        const h = i % 24;
+        return `D${d} ${h}h`;
+      });
+
+      // Trim current curve to elapsed hours
+      const currentData = currentCurve.slice(0, elapsedHours).map(v => v / 1e6);
+      const prevData = hasPrev ? prevCurve.map(v => v / 1e6) : null;
+
+      const ctx = document.getElementById('comparisonChart').getContext('2d');
+      if (comparisonChart) comparisonChart.destroy();
+
+      const datasets = [{
+        label: 'Esta semana',
+        data: currentData,
+        borderColor: '#4ade80',
+        backgroundColor: 'rgba(74,222,128,0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHitRadius: 8
+      }];
+
+      if (prevData) {
+        datasets.push({
+          label: 'Semana pasada',
+          data: prevData,
+          borderColor: '#52525b',
+          borderDash: [6, 3],
+          borderWidth: 1.5,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHitRadius: 8
+        });
+      }
+
+      const maxY = Math.max(
+        ...currentData,
+        ...(prevData || [0]),
+        0.1
+      );
+
+      comparisonChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              align: 'end',
+              labels: {
+                color: '#71717a',
+                font: { size: 11 },
+                boxWidth: 12,
+                padding: 12
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}M tokens`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: '#52525b',
+                font: { size: 10 },
+                maxRotation: 0,
+                callback: function(val, idx) {
+                  // Show label every 24h
+                  return idx % 24 === 0 ? this.getLabelForValue(val) : '';
+                }
+              },
+              grid: { display: false }
+            },
+            y: {
+              min: 0,
+              max: Math.ceil(maxY * 1.15 * 10) / 10 || 1,
+              ticks: {
+                color: '#52525b',
+                font: { size: 11 },
+                callback: v => v.toFixed(1) + 'M'
+              },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            }
+          }
+        }
+      });
+
+      // Summary text
+      const summaryEl = document.getElementById('comparison-summary');
+      if (elapsedHours > 0) {
+        const currentNow = currentCurve[elapsedHours - 1] || 0;
+        const prevAtSamePoint = hasPrev && elapsedHours <= prevCurve.length ? prevCurve[elapsedHours - 1] || 0 : 0;
+
+        if (hasPrev && prevAtSamePoint > 0) {
+          const diff = currentNow - prevAtSamePoint;
+          const pctDiff = Math.round((diff / prevAtSamePoint) * 100);
+          const sign = diff >= 0 ? '+' : '';
+          const color = diff >= 0 ? '#f97316' : '#4ade80';
+          summaryEl.innerHTML = `A las <strong>${elapsedHours}h</strong>: ` +
+            `<strong>${formatNumber(currentNow)}</strong> esta semana vs ` +
+            `<strong>${formatNumber(prevAtSamePoint)}</strong> anterior ` +
+            `(<span style="color:${color}">${sign}${formatNumber(Math.abs(diff))} / ${sign}${pctDiff}%</span>)`;
+        } else if (!hasPrev) {
+          summaryEl.innerHTML = `<span style="color:#71717a">Primera semana registrada — la comparacion estara disponible desde el proximo ciclo</span>`;
+        } else {
+          summaryEl.innerHTML = `A las <strong>${elapsedHours}h</strong>: <strong>${formatNumber(currentNow)}</strong> tokens reales`;
+        }
+      } else {
+        summaryEl.innerHTML = '';
+      }
+    }
+
+    async function loadPatternsTab() {
+      try {
+        const [dataRes] = await Promise.all([fetch('/api/data'), loadExternalData()]);
+        const data = await dataRes.json();
+
+        if (!data.blocks?.blocks) return;
+
+        const vpsBlocks = data.blocks.blocks;
+        const extBlocks = getExternalBlocks();
+        const allBlocks = [...vpsBlocks, ...extBlocks];
+
+        const cycle = getWeekCycleInfo();
+
+        // Delay one frame so container has final dimensions after tab switch
+        requestAnimationFrame(() => {
+          renderHeatmap(allBlocks, cycle);
+          renderComparison(allBlocks, cycle);
+        });
+      } catch (e) {
+        console.error('Error loading patterns tab:', e);
+      }
+    }
+
     loadData();
     loadGlobalUsage();
     loadWeeklyHistory();
+    loadPatternsTab();
     setInterval(loadData, 2 * 60 * 1000);
     setInterval(loadGlobalUsage, 5 * 60 * 1000);
+    setInterval(loadPatternsTab, 5 * 60 * 1000);
   </script>
 </body>
 </html>
