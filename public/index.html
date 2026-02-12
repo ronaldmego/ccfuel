@@ -1205,6 +1205,20 @@
 
     <!-- Tab: Patrones -->
     <div class="tab-content" id="tab-patrones">
+      <!-- Week Comparison -->
+      <div class="pattern-card">
+        <div class="pattern-card-header">
+          <span class="pattern-card-title">📊 Consumo: Esta Semana vs Anterior</span>
+        </div>
+        <div class="pattern-card-subtitle">Tokens reales acumulados por hora del ciclo</div>
+        <div id="comparison-container">
+          <div class="comparison-wrapper">
+            <canvas id="comparisonChart"></canvas>
+          </div>
+          <div class="comparison-summary" id="comparison-summary"></div>
+        </div>
+      </div>
+
       <!-- Heatmap -->
       <div class="pattern-card">
         <div class="pattern-card-header">
@@ -1218,20 +1232,6 @@
             <div class="heatmap-legend-gradient"></div>
             <span>Mas</span>
           </div>
-        </div>
-      </div>
-
-      <!-- Week Comparison -->
-      <div class="pattern-card">
-        <div class="pattern-card-header">
-          <span class="pattern-card-title">📊 Consumo: Esta Semana vs Anterior</span>
-        </div>
-        <div class="pattern-card-subtitle">Tokens reales acumulados por hora del ciclo</div>
-        <div id="comparison-container">
-          <div class="comparison-wrapper">
-            <canvas id="comparisonChart"></canvas>
-          </div>
-          <div class="comparison-summary" id="comparison-summary"></div>
         </div>
       </div>
     </div>
