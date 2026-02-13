@@ -197,6 +197,57 @@ Funciones afectadas y corregidas:
 
 ---
 
+## Ventanas de Tiempo
+
+El dashboard opera con 3 ventanas de tiempo distintas. Cada metrica usa una sola ventana y **no deben mezclarse**.
+
+| Ventana | Rango | Metricas que la usan |
+|---------|-------|---------------------|
+| **Ciclo semanal** | 7 dias rolling, reset a hora especifica (ej: 10am) | Gauges (sesion/semanal), pace, heatmap, comparacion semanal |
+| **Ciclo facturacion** | Mensual (ej: 2 feb → 2 mar) | Dias restantes, Tokens Ciclo (tab Eficiencia) |
+| **Calendario** | Ultimos 14 dias (medianoche a medianoche) | Chart "Consumo Tokens por Dia", chart "Tokens por Franja Horaria" |
+
+### Por que no coinciden los numeros entre charts
+
+Un bloque registrado a las 1pm del dia de reset puede caer en la semana **anterior** (si el reset es a las 3pm) pero en el dia calendario **de hoy**. Esto es correcto — cada ventana agrupa por su propia logica.
+
+---
+
+## Pace Semanal
+
+Compara tokens reales consumidos en la semana actual vs la semana anterior, al mismo punto del ciclo.
+
+### Calculo
+
+```
+currentCurve = computeWeeklyCurve(allBlocks, cycleStart, nextReset)  // 168 buckets
+prevCurve = computeWeeklyCurve(allBlocks, cycleStart - 7d, cycleStart)
+
+elapsedHours = floor(elapsedDays * 24)
+currentTokensAtNow = currentCurve[elapsedHours - 1]
+prevTokensAtNow = prevCurve[elapsedHours - 1]
+tokenDiffPct = (current - prev) / prev * 100
+```
+
+### Clasificacion
+
+| tokenDiffPct | Estado | Color |
+|-------------|--------|-------|
+| <= -20% | Por debajo | Verde |
+| -20% a +20% | Similar | Verde |
+| +20% a +50% | Por encima | Naranja |
+| > +50% | Muy por encima | Rojo |
+
+### Barra visual
+
+Escala = `max(current, prev) * 1.15` (15% headroom). Barra solida = semana actual. Marcador punteado = semana anterior al mismo punto.
+
+### Nota importante
+
+El pace usa tokens de ccusage (solo logs JSONL), **no** `weekAllPercent` de Claude `/usage`. Mezclar ambas fuentes produce discrepancias porque `/usage` incluye web y API que ccusage no ve.
+
+---
+
 ## Eficiencia Semanal
 
 Los tokens de Claude no se acumulan — lo que no usas en la semana se pierde al reset. Por eso medimos eficiencia como:
@@ -205,15 +256,18 @@ Los tokens de Claude no se acumulan — lo que no usas en la semana se pierde al
 eficiencia = 100% - weekPercent (lo que queda disponible)
 ```
 
-Y pace:
+### Colores relativos al ciclo
+
+Los colores de eficiencia son relativos al progreso esperado, no umbrales absolutos:
+
 ```
-idealPercent = (elapsedDays / 7) * 100
-ratio = realPercent / idealPercent
+expectedPercent = (elapsedDays / 7) * 100
+paceRatio = weekPercent / expectedPercent
 ```
 
-- ratio <= 1.15: On track
-- ratio <= 1.50: Acelerado
-- ratio > 1.50: Critico
+- paceRatio <= 1.15: Verde (on track o por debajo)
+- paceRatio <= 1.50: Amarillo (acelerado)
+- paceRatio > 1.50: Rojo (critico)
 
 > **Nota:** `elapsedDays` es fraccionario (ej: 6.4), no un entero de dia de semana.
 

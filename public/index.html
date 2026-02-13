@@ -563,7 +563,7 @@
       height: 24px;
       background: rgba(255,255,255,0.06);
       border-radius: 12px;
-      overflow: hidden;
+      overflow: visible;
       margin-bottom: 8px;
     }
 
@@ -571,14 +571,19 @@
       height: 100%;
       border-radius: 12px;
       transition: width 0.5s ease;
+      max-width: 100%;
     }
 
     .pace-bar-ideal {
       position: absolute;
-      top: 0;
-      bottom: 0;
+      top: -2px;
+      bottom: -2px;
       width: 2px;
-      background: #e4e4e7;
+      background: repeating-linear-gradient(
+        to bottom,
+        #a1a1aa 0px, #a1a1aa 4px,
+        transparent 4px, transparent 8px
+      );
       z-index: 2;
     }
 
@@ -1020,7 +1025,7 @@
         <!-- Weekly Pace Indicator -->
         <div class="pace-section" id="pace-section">
           <div class="pace-header">
-            <span class="pace-title">Pace Semanal</span>
+            <span class="pace-title">Pace Semanal (vs semana anterior)</span>
             <span class="pace-status" id="pace-status">—</span>
           </div>
           <div class="pace-bar-container">
@@ -1029,24 +1034,11 @@
           </div>
           <div class="pace-details">
             <span id="pace-day-info">—</span>
-            <span id="pace-projection">—</span>
           </div>
         </div>
 
         <div class="global-usage-footer" id="global-usage-footer">
           <span id="global-usage-status">Cargando...</span>
-        </div>
-      </div>
-
-      <!-- Cycle Summary Row (ccusage) -->
-      <div class="cycle-summary">
-        <div class="cycle-item">
-          <div class="cycle-item-value" id="cycle-days-left">—</div>
-          <div class="cycle-item-label">Dias Restantes</div>
-        </div>
-        <div class="cycle-item">
-          <div class="cycle-item-value" id="cycle-tokens">—</div>
-          <div class="cycle-item-label">Tokens Ciclo</div>
         </div>
       </div>
 
@@ -1082,29 +1074,11 @@
         </div>
       </div>
 
-      <!-- Consumption Cards -->
-      <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
-        <div class="stat-card" style="--accent-color: #f97316; --icon-bg: rgba(249,115,22,0.15);">
-          <div class="stat-icon">🔥</div>
-          <div class="stat-label">Gastado Hoy</div>
-          <div class="stat-value" style="color: #f97316;" id="fuel-today">—</div>
-          <div class="stat-sub" id="fuel-today-sub"></div>
-          <div class="stat-sub" style="color:#52525b;">Reset: medianoche</div>
-        </div>
-
-        <div class="stat-card" style="--accent-color: #a78bfa; --icon-bg: rgba(167,139,250,0.15);">
-          <div class="stat-icon">📊</div>
-          <div class="stat-label">Promedio Diario</div>
-          <div class="stat-value purple" id="fuel-avg">—</div>
-          <div class="stat-sub" id="fuel-avg-sub"></div>
-        </div>
-      </div>
-
       <!-- Charts -->
       <div class="charts-grid">
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">⛽ Gasolina Diaria Real (14 dias)</span>
+            <span class="chart-title">⛽ Consumo Tokens por Dia (14 dias)</span>
             <div class="chart-legend" id="daily-chart-legend">
               <span class="legend-item">
                 <span class="legend-dot" style="background: #4ade80;"></span>
@@ -1115,11 +1089,12 @@
           <div class="chart-wrapper">
             <canvas id="dailyChart"></canvas>
           </div>
+          <div style="font-size:0.7em; color:#52525b; margin-top:6px;">Tokens reales por dia calendario (medianoche a medianoche). No coincide exactamente con el ciclo semanal que inicia a una hora especifica.</div>
         </div>
 
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">🕐 Gasolina por Franja Horaria</span>
+            <span class="chart-title">🕐 Tokens por Franja Horaria</span>
             <div class="chart-legend" id="hourly-chart-legend">
               <span class="legend-item">
                 <span class="legend-dot" style="background: #4ade80;"></span>
@@ -1136,6 +1111,21 @@
 
     <!-- Tab: Eficiencia -->
     <div class="tab-content" id="tab-eficiencia">
+      <!-- Billing Cycle Summary (monthly) -->
+      <div class="cycle-summary">
+        <div class="cycle-item">
+          <div class="cycle-item-value" id="cycle-days-left">—</div>
+          <div class="cycle-item-label">Dias Restantes</div>
+        </div>
+        <div class="cycle-item">
+          <div class="cycle-item-value" id="cycle-tokens">—</div>
+          <div class="cycle-item-label">Tokens Ciclo</div>
+        </div>
+        <div style="grid-column: 1 / -1; text-align: center; font-size: 0.7em; color: #52525b; padding: 0 8px;">
+          Ciclo de facturacion mensual (<span id="cycle-note-range">—</span>). Distinto del ciclo semanal de los gauges.
+        </div>
+      </div>
+
       <!-- Current Week -->
       <div class="eff-card">
         <div class="eff-header">
@@ -1248,6 +1238,8 @@
     let externalData = null; // { sources: { laptop: { blocks, daily, lastUpdate } } }
     let weeklyResetHour = null; // Hour (0-23) when Claude's week resets, from /usage
     let weeklyResetsAt = null;  // Full ISO datetime of next weekly reset, from /usage
+    let cachedAllBlocks = null; // VPS + external blocks, set by loadData()
+    let weeklyHistoryCache = null; // Weekly history array, set by loadWeeklyHistory()
 
     const PANAMA_OFFSET = -5;
 
@@ -1415,39 +1407,8 @@
         const blocks = data.blocks.blocks;
         const activeBlock = blocks.find(b => b.isActive);
 
-        // Consumption cards: real tokens (no cache reads)
-        {
-          const cycle = getWeekCycleInfo();
-          const todayISO = getPanamaTodayISO();
-
-          // Weekly real tokens (for average calc) — use Claude's actual cycle start
-          const vpsWeekFuel = blocks.filter(b => !b.isGap && b.startTime >= cycle.cycleStartISO)
-            .reduce((sum, b) => sum + blockRealTokens(b), 0);
-          const extBlocks = getExternalBlocks();
-          const extWeekFuel = extBlocks.filter(b => !b.isGap && b.startTime >= cycle.cycleStartISO)
-            .reduce((sum, b) => sum + blockRealTokens(b), 0);
-          const totalWeekFuel = vpsWeekFuel + extWeekFuel;
-          const avgDaily = cycle.elapsedDays > 0 ? totalWeekFuel / cycle.elapsedDays : 0;
-
-          // Today
-          const vpsTodayEntry = data.daily.daily.find(d => d.date === todayISO);
-          const vpsTodayFuel = vpsTodayEntry ? dailyRealTokens(vpsTodayEntry) : 0;
-          const extDailyMapToday = getExternalDailyMap();
-          const extTodayFuel = extDailyMapToday[todayISO] || 0;
-          const totalTodayFuel = vpsTodayFuel + extTodayFuel;
-
-          // Gastado Hoy
-          document.getElementById('fuel-today').textContent = formatNumber(totalTodayFuel);
-          document.getElementById('fuel-today-sub').textContent = extTodayFuel > 0
-            ? `VPS ${formatNumber(vpsTodayFuel)} + Laptop ${formatNumber(extTodayFuel)}`
-            : `${formatNumber(totalWeekFuel)} esta semana`;
-
-          // Promedio Diario
-          document.getElementById('fuel-avg').textContent = formatNumber(avgDaily);
-          const daysLabel = Math.round(cycle.elapsedDays * 10) / 10;
-          document.getElementById('fuel-avg-sub').textContent =
-            `${formatNumber(totalWeekFuel)} en ${daysLabel}d este ciclo`;
-        }
+        // Cache all blocks (VPS + external) for pace comparison
+        cachedAllBlocks = [...blocks, ...getExternalBlocks()];
 
         // Cycle stats
         const cycleStats = analyzeBillingCycle(blocks);
@@ -1456,6 +1417,7 @@
         const startStr = fmtBilling(cycleStats.cycleStart);
         const endStr = fmtBilling(cycleStats.cycleEnd);
         document.getElementById('cycle-range').textContent = `${startStr} → ${endStr}`;
+        document.getElementById('cycle-note-range').textContent = `${startStr} → ${endStr}`;
         document.getElementById('cycle-days-left').textContent = `${cycleStats.daysLeft}d`;
         const extStats = getExternalCycleStats();
         const totalCycleTokens = cycleStats.cycleTokens + extStats.tokens;
@@ -1718,61 +1680,105 @@
 
     function updatePace(weekAllPercent) {
       const cycle = getWeekCycleInfo();
-      const idealPercent = Math.round((cycle.elapsedDays / 7) * 100);
       const realPercent = weekAllPercent;
+      const elapsedHours = Math.min(Math.floor(cycle.elapsedDays * 24), 168);
 
-      // Determine status
+      // Token-based comparison against previous week (same data as Patrones chart)
+      let hasPrevWeek = false;
       let status, statusClass, barColor;
-      const ratio = realPercent / Math.max(idealPercent, 1);
+      let currentTokensAtNow = 0, prevTokensAtNow = 0, tokenDiffPct = 0;
 
-      if (ratio <= 1.15) {
-        status = 'On track';
-        statusClass = 'on-track';
-        barColor = 'linear-gradient(90deg, #4ade80, #22d3ee)';
-      } else if (ratio <= 1.5) {
-        status = 'Acelerado';
-        statusClass = 'accelerated';
-        barColor = 'linear-gradient(90deg, #fbbf24, #f97316)';
-      } else {
-        status = 'Critico';
-        statusClass = 'critical';
-        barColor = 'linear-gradient(90deg, #f87171, #ef4444)';
+      if (cachedAllBlocks && cachedAllBlocks.length > 0 && elapsedHours > 0) {
+        const currentEnd = new Date(cycle.nextReset).toISOString();
+        const currentCurve = computeWeeklyCurve(cachedAllBlocks, cycle.cycleStartISO, currentEnd);
+
+        const prevStartDate = new Date(new Date(cycle.cycleStartISO).getTime() - 7 * 24 * 60 * 60 * 1000);
+        const prevCurve = computeWeeklyCurve(cachedAllBlocks, prevStartDate.toISOString(), cycle.cycleStartISO);
+
+        const prevTotalTokens = prevCurve[167];
+
+        if (prevTotalTokens > 0) {
+          hasPrevWeek = true;
+          currentTokensAtNow = currentCurve[elapsedHours - 1] || 0;
+          prevTokensAtNow = prevCurve[elapsedHours - 1] || 0;
+
+          // Token % difference (same metric as Patrones chart summary)
+          tokenDiffPct = prevTokensAtNow > 0
+            ? Math.round(((currentTokensAtNow - prevTokensAtNow) / prevTokensAtNow) * 100)
+            : (currentTokensAtNow > 0 ? 100 : 0);
+        }
       }
 
-      // Update UI
+      if (hasPrevWeek) {
+        // Status based on token comparison (matches Patrones chart)
+        if (tokenDiffPct <= -20) {
+          status = 'Por debajo';
+          statusClass = 'on-track';
+          barColor = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+        } else if (tokenDiffPct <= 20) {
+          status = 'Similar';
+          statusClass = 'on-track';
+          barColor = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+        } else if (tokenDiffPct <= 50) {
+          status = 'Por encima';
+          statusClass = 'accelerated';
+          barColor = 'linear-gradient(90deg, #fbbf24, #f97316)';
+        } else {
+          status = 'Muy por encima';
+          statusClass = 'critical';
+          barColor = 'linear-gradient(90deg, #f87171, #ef4444)';
+        }
+
+        // Bar: current vs prev on same scale (add 15% headroom so marker isn't at edge)
+        const maxTokens = Math.max(currentTokensAtNow, prevTokensAtNow, 1) * 1.15;
+        const barFillPct = (currentTokensAtNow / maxTokens) * 100;
+        const markerPct = (prevTokensAtNow / maxTokens) * 100;
+
+        // Update bar UI
+        const barFill = document.getElementById('pace-bar-fill');
+        barFill.style.width = barFillPct + '%';
+        barFill.style.background = barColor;
+
+        const idealMarker = document.getElementById('pace-bar-ideal');
+        idealMarker.style.left = markerPct + '%';
+        idealMarker.setAttribute('data-label', `Sem. ant. ${formatNumber(prevTokensAtNow)}`);
+
+        // Details: token amounts + % diff (same as Patrones chart summary)
+        const sign = tokenDiffPct >= 0 ? '+' : '';
+        const diffColor = tokenDiffPct > 20 ? '#f97316' : tokenDiffPct < -20 ? '#4ade80' : '#a1a1aa';
+        document.getElementById('pace-day-info').innerHTML =
+          `Dia <strong>${cycle.dayNum}/7</strong>, hora ${elapsedHours} — <strong>${formatNumber(currentTokensAtNow)}</strong> vs <strong>${formatNumber(prevTokensAtNow)}</strong> sem. ant. (<span style="color:${diffColor}">${sign}${tokenDiffPct}%</span>)`;
+      } else {
+        // Fallback: linear pace (no previous week data)
+        const idealPercent = Math.round((cycle.elapsedDays / 7) * 100);
+        const ratio = realPercent / Math.max(idealPercent, 1);
+        if (ratio <= 1.15) {
+          status = 'On track'; statusClass = 'on-track';
+          barColor = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+        } else if (ratio <= 1.5) {
+          status = 'Acelerado'; statusClass = 'accelerated';
+          barColor = 'linear-gradient(90deg, #fbbf24, #f97316)';
+        } else {
+          status = 'Critico'; statusClass = 'critical';
+          barColor = 'linear-gradient(90deg, #f87171, #ef4444)';
+        }
+
+        const barFill = document.getElementById('pace-bar-fill');
+        barFill.style.width = Math.min(realPercent, 100) + '%';
+        barFill.style.background = barColor;
+
+        const idealMarker = document.getElementById('pace-bar-ideal');
+        idealMarker.style.left = idealPercent + '%';
+        idealMarker.setAttribute('data-label', `Ideal ${idealPercent}%`);
+
+        document.getElementById('pace-day-info').innerHTML =
+          `Dia <strong>${cycle.dayNum}/7</strong> — Ideal: <strong>${idealPercent}%</strong> — Real: <strong>${realPercent}%</strong>`;
+      }
+
+      // Status badge
       const statusEl = document.getElementById('pace-status');
       statusEl.textContent = status;
       statusEl.className = 'pace-status ' + statusClass;
-
-      const barFill = document.getElementById('pace-bar-fill');
-      barFill.style.width = Math.min(realPercent, 100) + '%';
-      barFill.style.background = barColor;
-
-      const idealMarker = document.getElementById('pace-bar-ideal');
-      idealMarker.style.left = idealPercent + '%';
-      idealMarker.setAttribute('data-label', `Ideal ${idealPercent}%`);
-
-      document.getElementById('pace-day-info').innerHTML =
-        `Dia <strong>${cycle.dayNum}/7</strong> — Ideal: <strong>${idealPercent}%</strong> — Real: <strong>${realPercent}%</strong>`;
-
-      // Depletion projection
-      const ratePerDay = cycle.elapsedDays > 0 ? realPercent / cycle.elapsedDays : 0;
-      const projected = realPercent + (ratePerDay * cycle.daysRemaining);
-
-      if (projected > 100) {
-        const daysUntilDepletion = (100 - realPercent) / Math.max(ratePerDay, 0.01);
-        // Calculate the actual date of depletion in Panama time
-        const depletionDate = getPanamaDate();
-        depletionDate.setUTCDate(depletionDate.getUTCDate() + Math.ceil(daysUntilDepletion));
-        const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-        const depletionLabel = dayNames[depletionDate.getUTCDay()] + ' ' + depletionDate.getUTCDate();
-        document.getElementById('pace-projection').innerHTML =
-          `Se agota el <strong style="color:#f87171">${depletionLabel}</strong> (proy. ${Math.round(projected)}%)`;
-      } else {
-        document.getElementById('pace-projection').innerHTML =
-          `Llegas al reset con <strong style="color:#4ade80">${Math.round(100 - projected)}%</strong> de margen`;
-      }
-
     }
 
     // Fuel gauge helper
@@ -1953,14 +1959,19 @@
       const cycle = getWeekCycleInfo();
       const riskPercent = 100 - weekPercent;
 
-      // Big numbers
+      // Big numbers — color relative to cycle progress, not absolute
+      const expectedPercent = Math.round((cycle.elapsedDays / 7) * 100);
       const usedEl = document.getElementById('eff-used-pct');
       usedEl.textContent = weekPercent + '%';
-      usedEl.className = 'eff-big-number ' + (weekPercent > 80 ? 'green' : weekPercent > 50 ? 'yellow' : 'red');
+      // Green if at or below expected pace, yellow if slightly above, red if way above
+      const paceRatio = weekPercent / Math.max(expectedPercent, 1);
+      usedEl.className = 'eff-big-number ' + (paceRatio <= 1.15 ? 'green' : paceRatio <= 1.5 ? 'yellow' : 'red');
 
       const riskEl = document.getElementById('eff-risk-pct');
       riskEl.textContent = riskPercent + '%';
-      riskEl.className = 'eff-big-number ' + (riskPercent > 30 ? 'red' : riskPercent > 10 ? 'yellow' : 'green');
+      // Risk color: neutral early in cycle, only alarming if very little left late in cycle
+      const daysLeft = 7 - cycle.elapsedDays;
+      riskEl.className = 'eff-big-number ' + (riskPercent < 15 && daysLeft > 1 ? 'red' : riskPercent < 30 && daysLeft > 2 ? 'yellow' : 'green');
 
       // Bar
       document.getElementById('eff-bar-used').style.width = weekPercent + '%';
@@ -1997,6 +2008,8 @@
         const res = await fetch('/api/weekly-history');
         const data = await res.json();
         const tbody = document.getElementById('eff-history-body');
+
+        weeklyHistoryCache = data.history || [];
 
         if (!data.history || data.history.length === 0) {
           tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px; color:#52525b;">Sin historial aun (se registra automaticamente)</td></tr>';
@@ -2283,10 +2296,11 @@
       }
     }
 
-    loadData();
-    loadGlobalUsage();
-    loadWeeklyHistory();
-    loadPatternsTab();
+    // Load blocks + history first, then global usage (which needs them for pace comparison)
+    Promise.all([loadData(), loadWeeklyHistory()]).then(() => {
+      loadGlobalUsage();
+      loadPatternsTab();
+    });
     setInterval(loadData, 2 * 60 * 1000);
     setInterval(loadGlobalUsage, 5 * 60 * 1000);
     setInterval(loadPatternsTab, 5 * 60 * 1000);

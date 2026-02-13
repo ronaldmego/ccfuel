@@ -147,11 +147,15 @@ token-dashboard/
 
 ### Metricas del Dashboard
 
-**Tab Overview:** Uso global real (% semanal), pace semanal, proyeccion de agotamiento, sesion actual, barra de ciclo (dias restantes + tokens ciclo), gasolina hoy, promedio diario. Charts de uso diario y por franja horaria (solo tokens reales, sin cache reads).
+**Tab Overview:** Gauges de sesion y semanal (% restante), pace semanal (comparacion token-based vs semana anterior), charts de consumo diario (14 dias calendario) y por franja horaria. Solo tokens reales, sin cache reads.
 
 **Tab Patrones:** Heatmap de actividad semanal (7 dias x 24 horas, CSS grid), comparacion de consumo semana actual vs anterior (Chart.js line chart, tokens acumulados).
 
-**Tab Eficiencia:** Eficiencia semanal actual (% usado vs disponible), historial de semanas anteriores, tokens combinados VPS+Laptop.
+**Tab Eficiencia:** Barra de ciclo de facturacion mensual (dias restantes + tokens ciclo), eficiencia semanal actual (% usado vs disponible, colores relativos al progreso del ciclo), historial de semanas anteriores, tokens combinados VPS+Laptop.
+
+### Ventanas de Tiempo (ver TECHNICAL-NOTES.md)
+
+El dashboard usa 3 ventanas de tiempo distintas. Cada metrica opera en una sola ventana y no deben mezclarse entre si.
 
 ---
 

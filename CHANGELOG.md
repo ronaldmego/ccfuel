@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-02-13
+
+### Mejora: Pace semanal basado en semana anterior
+
+El indicador "Pace semanal" ahora compara tokens reales contra la semana anterior (misma fuente que el chart de Patrones), en vez de una proyeccion lineal. Muestra barra de progreso con marcador punteado de la semana pasada y diferencia porcentual.
+
+### Mejora: Reorganizacion de paneles
+
+- **Overview** simplificado: solo gauges (sesion + semanal), pace, y charts de tokens. Eliminados cards "Gastado Hoy" y "Promedio Diario" (redundantes con charts).
+- **Eficiencia** ampliado: recibe la barra de ciclo de facturacion (Dias Restantes + Tokens Ciclo) que antes estaba en Overview.
+- Colores de eficiencia ahora relativos al progreso del ciclo (no umbrales absolutos).
+
+### Mejora: Claridad en metricas
+
+- Renombrados charts: "Gasolina Diaria Real" → "Consumo Tokens por Dia", "Gasolina por Franja Horaria" → "Tokens por Franja Horaria".
+- Notas aclaratorias bajo charts que usan ventanas de tiempo distintas al ciclo semanal.
+- Eliminada proyeccion de agotamiento (imprecisa con datos de una sola semana).
+
 ## 2026-02-12
 
 ### Feature: Tab Patrones (heatmap + comparacion semanal)
