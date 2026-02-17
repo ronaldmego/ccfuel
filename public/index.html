@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Token Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -923,6 +924,57 @@
       font-size: 0.9em;
     }
 
+    /* Kanban / Centro de Mando */
+    .kanban-section { margin-bottom: 24px; }
+    .kanban-section-title {
+      font-size: 1.1em; font-weight: 600; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .kanban-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+    @media (max-width: 600px) { .kanban-cards { grid-template-columns: 1fr; } }
+    .kanban-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .kanban-card-title { font-weight: 600; font-size: 0.95em; }
+    .kanban-card-desc { font-size: 0.82em; color: #a1a1aa; }
+    .kanban-card-note { font-size: 0.75em; color: #71717a; font-style: italic; }
+    .kanban-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .kanban-badge {
+      font-size: 0.7em; padding: 2px 8px; border-radius: 6px; font-weight: 600;
+      background: rgba(255,255,255,0.08); color: #a1a1aa;
+    }
+    .kanban-badge.critical { background: rgba(248,113,113,0.2); color: #f87171; }
+    .kanban-badge.high { background: rgba(251,191,36,0.2); color: #fbbf24; }
+    .kanban-badge.security { background: rgba(248,113,113,0.15); color: #f87171; }
+    .kanban-badge.content { background: rgba(167,139,250,0.15); color: #a78bfa; }
+    .kanban-badge.dev { background: rgba(56,189,248,0.15); color: #38bdf8; }
+    .kanban-badge.ops { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .kanban-badge.research { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .kanban-col-badge {
+      font-size: 0.65em; padding: 2px 6px; border-radius: 4px; font-weight: 500;
+      background: rgba(255,255,255,0.06); color: #71717a;
+    }
+    .kanban-links { display: flex; gap: 8px; margin-top: 4px; }
+    .kanban-link {
+      font-size: 0.75em; padding: 4px 10px; border-radius: 6px; text-decoration: none;
+      font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
+      transition: opacity 0.2s;
+    }
+    .kanban-link:hover { opacity: 0.8; }
+    .kanban-link.drive { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .kanban-link.github { background: rgba(167,139,250,0.15); color: #a78bfa; }
+
+    .workcycle-timeline { margin-top: 8px; }
+    .workcycle-entry {
+      padding: 12px 16px; border-left: 3px solid rgba(167,139,250,0.4);
+      margin-left: 8px; margin-bottom: 12px;
+      background: rgba(255,255,255,0.03); border-radius: 0 8px 8px 0;
+    }
+    .workcycle-time { font-size: 0.75em; color: #a78bfa; font-weight: 600; margin-bottom: 4px; }
+    .workcycle-summary { font-size: 0.85em; color: #e4e4e7; }
+    .workcycle-artifacts { font-size: 0.72em; color: #52525b; margin-top: 4px; }
+
     /* Footer */
     .footer {
       text-align: center;
@@ -979,7 +1031,7 @@
         <span class="tab-icon">🎯</span>
         <span>Eficiencia</span>
       </button>
-    </div>
+          </div>
 
     <!-- Tab: Overview -->
     <div class="tab-content active" id="tab-overview">
@@ -1226,7 +1278,7 @@
       </div>
     </div>
 
-    <!-- Footer -->
+        <!-- Footer -->
     <footer class="footer">
       Ultima actualizacion: <span id="last-update">—</span>
     </footer>
