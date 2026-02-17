@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-02-17
+
+### Fix: Reset de sesion mostraba fecha del reset semanal (#1)
+
+**Problema:** Los 3 KPIs de "Uso Global" mostraban la misma fecha de reset (feb 19). El reset de sesion (ej: 4:59pm hoy) no se mostraba — en su lugar aparecia el reset semanal.
+
+**Causa 1 — Parsing posicional:** El parser capturaba todos los "Resets ..." globalmente y los asignaba por indice (`resets[0]` = session, `resets[1]` = weekAll). Si el PTY garbleaba el reset de sesion y el regex no lo capturaba, los demas se corrian un lugar. Los valores incorrectos se persistian en `resets-cache.json`.
+
+**Causa 2 — Minutos opcionales:** El PTY a veces redondea y omite minutos ("5pm" en vez de "4:59pm"). El regex exigia `:MM` obligatorio, causando que ningun reset matcheara.
+
+**Fix (`claude-usage.js`):**
+- Parsing por seccion: divide el texto PTY por headers ("Current session", "Current week (all models)", "Current week (Sonnet only)") y parsea cada seccion independientemente
+- Regex con minutos opcionales: `(\d{1,2})(?::(\d{2}))?\s*(am|pm)` — si no hay minutos, default `:00`
+
 ## 2026-02-13
 
 ### Mejora: Pace semanal basado en semana anterior

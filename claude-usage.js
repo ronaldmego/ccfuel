@@ -30,7 +30,7 @@ function getClaudeUsage(debug = false) {
         resolve(parseUsageOutput(output));
       }
     }, 20000);
-    
+
     ptyProcess.onData((data) => {
       output += data;
       if (debug) {
@@ -82,74 +82,108 @@ function parseUsageOutput(output) {
     .replace(/\x1b\][^\x07]*\x07/g, ' ')
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ')
     .replace(/\s+/g, ' ');
-  
-  // Find percentages (XX% used pattern)
-  const percentMatches = clean.match(/(\d+)%\s*used/gi) || [];
-  const percents = percentMatches.map(m => parseInt(m.match(/\d+/)[0]));
 
-  // Find reset times with optional dates
-  // Format with date: "Resets Feb 19, 9:59am" (weekly reset days away)
-  // Format without date: "Resets 4:59pm" (session reset or reset is today/tomorrow)
-  // PTY garbles "Resets" into "Rese s", "Reset s", etc. so use lenient prefix
-  // The (?:[\w,]*\s+)*? handles garbled chars between "Res..." and the time/date
-  const resetRegex = /Res\w*\s+(?:[\w,]*\s+)*?(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+)?(\d{1,2}):(\d{2})\s*(am|pm)/gi;
-  const resets = [];
-  let resetMatch;
-  while ((resetMatch = resetRegex.exec(clean)) !== null) {
-    const monthStr = resetMatch[1]; // undefined if no date
-    const dayStr = resetMatch[2];   // undefined if no date
-    let hour = parseInt(resetMatch[3]);
-    const minute = parseInt(resetMatch[4]);
-    const ampm = resetMatch[5].toLowerCase();
-    if (ampm === 'pm' && hour !== 12) hour += 12;
-    if (ampm === 'am' && hour === 12) hour = 0;
+  // --- Section-based parsing ---
+  // Instead of matching resets globally by position (fragile — if one fails
+  // to parse, all subsequent ones shift), we split the text by section headers
+  // and parse each section independently.
+  const sectionDefs = [
+    { key: 'session',    regex: /current\s+session/i },
+    { key: 'weekAll',    regex: /current\s+week\s*\(?\s*all/i },
+    { key: 'weekSonnet', regex: /current\s+week\s*\(?\s*sonnet/i }
+  ];
 
-    let resetsAt = null;
-    if (monthStr && dayStr) {
-      // Full date provided — convert Panama time to UTC
-      const monthMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-      const month = monthMap[monthStr.toLowerCase().slice(0, 3)];
-      const day = parseInt(dayStr);
-      const year = new Date().getUTCFullYear();
-      // Panama is UTC-5, so add 5h to get UTC
-      resetsAt = new Date(Date.UTC(year, month, day, hour + 5, minute, 0)).toISOString();
-    } else {
-      // No date — reset is today or tomorrow (compute from current time)
-      const now = new Date();
-      const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
-      const panama = new Date(panamaMs);
-      let resetDate = new Date(panama);
-      resetDate.setUTCHours(hour, minute, 0, 0);
-      if (panama >= resetDate) {
-        resetDate.setUTCDate(resetDate.getUTCDate() + 1);
-      }
-      // Convert panama-shifted back to real UTC
-      resetsAt = new Date(resetDate.getTime() + 5 * 60 * 60 * 1000).toISOString();
-    }
-    resets.push({ hour, resetsAt });
+  const boundaries = [];
+  for (const sd of sectionDefs) {
+    const m = sd.regex.exec(clean);
+    if (m) boundaries.push({ key: sd.key, index: m.index });
   }
+  boundaries.sort((a, b) => a.index - b.index);
+
+  // Extract text for each section (from its header to the next header or end)
+  const sectionTexts = {};
+  for (let i = 0; i < boundaries.length; i++) {
+    const start = boundaries[i].index;
+    const end = i + 1 < boundaries.length ? boundaries[i + 1].index : clean.length;
+    sectionTexts[boundaries[i].key] = clean.slice(start, end);
+  }
+
+  // Parse percent and reset time from a section's text
+  function parseSection(text) {
+    if (!text) return { percent: 0, resetsAtHour: null, resetsAt: null };
+
+    const pctMatch = text.match(/(\d+)%\s*used/i);
+    const percent = pctMatch ? parseInt(pctMatch[1]) : 0;
+
+    // Reset time regex — applied per-section
+    // Minutes are optional: PTY sometimes rounds "4:59pm" → "5pm"
+    const rstMatch = text.match(/Res\w*\s+(?:[\w,]*\s+)*?(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+
+    let resetsAtHour = null;
+    let resetsAt = null;
+
+    if (rstMatch) {
+      const monthStr = rstMatch[1]; // undefined if no date
+      const dayStr = rstMatch[2];   // undefined if no date
+      let hour = parseInt(rstMatch[3]);
+      const minute = rstMatch[4] != null ? parseInt(rstMatch[4]) : 0;
+      const ampm = rstMatch[5].toLowerCase();
+      if (ampm === 'pm' && hour !== 12) hour += 12;
+      if (ampm === 'am' && hour === 12) hour = 0;
+
+      resetsAtHour = hour;
+
+      if (monthStr && dayStr) {
+        // Full date provided — convert Panama time to UTC
+        const monthMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+        const month = monthMap[monthStr.toLowerCase().slice(0, 3)];
+        const day = parseInt(dayStr);
+        const year = new Date().getUTCFullYear();
+        // Panama is UTC-5, so add 5h to get UTC
+        resetsAt = new Date(Date.UTC(year, month, day, hour + 5, minute, 0)).toISOString();
+      } else {
+        // No date — reset is today or tomorrow (compute from current time)
+        const now = new Date();
+        const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
+        const panama = new Date(panamaMs);
+        let resetDate = new Date(panama);
+        resetDate.setUTCHours(hour, minute, 0, 0);
+        if (panama >= resetDate) {
+          resetDate.setUTCDate(resetDate.getUTCDate() + 1);
+        }
+        // Convert panama-shifted back to real UTC
+        resetsAt = new Date(resetDate.getTime() + 5 * 60 * 60 * 1000).toISOString();
+      }
+    }
+
+    return { percent, resetsAtHour, resetsAt };
+  }
+
+  const session = parseSection(sectionTexts.session);
+  const weekAll = parseSection(sectionTexts.weekAll);
+  const weekSonnet = parseSection(sectionTexts.weekSonnet);
 
   // Check extra usage
   const extraEnabled = /extra usage enabled/i.test(clean) && !/not enabled/i.test(clean);
   const extraMatch = clean.match(/\$(\d+)\s*free/i);
 
   return {
-    success: percents.length >= 2,
+    success: boundaries.length >= 2 && (session.percent > 0 || weekAll.percent > 0),
     timestamp: new Date().toISOString(),
     session: {
-      percent: percents[0] || 0,
-      resetsAtHour: resets[0]?.hour ?? null,
-      resetsAt: resets[0]?.resetsAt ?? null
+      percent: session.percent,
+      resetsAtHour: session.resetsAtHour,
+      resetsAt: session.resetsAt
     },
     weekAll: {
-      percent: percents[1] || 0,
-      resetsAtHour: resets[1]?.hour ?? null,
-      resetsAt: resets[1]?.resetsAt ?? null
+      percent: weekAll.percent,
+      resetsAtHour: weekAll.resetsAtHour,
+      resetsAt: weekAll.resetsAt
     },
     weekSonnet: {
-      percent: percents[2] || 0,
-      resetsAtHour: resets[2]?.hour ?? null,
-      resetsAt: resets[2]?.resetsAt ?? null
+      percent: weekSonnet.percent,
+      resetsAtHour: weekSonnet.resetsAtHour,
+      resetsAt: weekSonnet.resetsAt
     },
     extraUsage: {
       enabled: extraEnabled,

@@ -130,6 +130,16 @@ dayNum = ceil(elapsedDays), max 7
 
 Tanto `server.js` como `index.html` usan esta misma logica (ver `getWeekCycleInfo()` en ambos).
 
+### Parsing de resets: por seccion, no por posicion
+
+El parser PTY (`claude-usage.js`) extrae 3 resets del output de `/usage`. Cada tipo (session, weekAll, weekSonnet) tiene su propio formato y ventana de tiempo.
+
+**Metodo:** El texto limpio del PTY se divide en secciones usando los headers "Current session", "Current week (all models)", "Current week (Sonnet only)". Cada seccion se parsea independientemente para su porcentaje y tiempo de reset. Esto evita que un reset no-parseado desplace a los demas.
+
+**Formato de hora variable:** El PTY a veces muestra "4:59pm" y a veces redondea a "5pm" (sin minutos). El regex acepta ambos formatos: `(\d{1,2})(?::(\d{2}))?\s*(am|pm)`.
+
+**Persistencia:** `data/resets-cache.json` guarda el ultimo `resetsAt` valido por seccion. Si el PTY no logra parsear un reset, se reutiliza el valor persistido (siempre que no haya expirado). Esto protege contra garbling intermitente del PTY.
+
 ### Ejemplo
 
 Si Claude dice "resets at 10am" y hoy es miercoles 11 feb a las 7pm:
