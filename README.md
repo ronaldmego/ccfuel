@@ -41,6 +41,18 @@ Data: ccusage (parses JSONL logs) + Claude /usage (via PTY)
 Process Manager: PM2 (optional)
 ```
 
+## Prerequisites
+
+- **Node.js** 18+
+- **Claude Code** installed and authenticated
+- **Build tools** (required by `node-pty` native module):
+
+| OS | Install command |
+|----|----------------|
+| Ubuntu/Debian | `sudo apt install build-essential python3` |
+| macOS | `xcode-select --install` |
+| Windows | `npm install -g windows-build-tools` |
+
 ## Quick Start
 
 Works on any machine where Claude Code is installed. Reads `~/.claude/` logs automatically.
@@ -76,6 +88,7 @@ cp .env.example .env
 |----------|---------|-------------|
 | `DASHBOARD_HOST` | `127.0.0.1` | Bind address |
 | `DASHBOARD_PORT` | `3400` | Server port |
+| `DASHBOARD_TIMEZONE` | `-5` | UTC offset in hours (e.g., `-5` for EST, `+1` for CET, `0` for UTC) |
 | `CLAUDE_LOGS_DIR` | `~/.claude` | Path to Claude Code JSONL logs |
 
 ## Architecture

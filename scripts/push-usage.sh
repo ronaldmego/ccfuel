@@ -1,10 +1,10 @@
 #!/bin/bash
-# Push ccusage data from laptop to VPS token-dashboard
-# Usage: bash push-usage.sh
+# Push ccusage data from this machine to a remote dashboard server
+# Usage: DASHBOARD_URL=http://your-server:3400 bash push-usage.sh
 # Hook:  Runs automatically via Claude Code SessionEnd hook
-# Cron:  Task Scheduler every 30 min as backup
+# Cron:  crontab or Task Scheduler as backup
 
-VPS_URL="${VPS_URL:-http://localhost:3400}"
+DASHBOARD_URL="${DASHBOARD_URL:-${VPS_URL:-http://localhost:3400}}"
 SOURCE="laptop"
 TMPDIR="${TEMP:-${TMP:-/tmp}}"
 PAYLOAD="$TMPDIR/ccusage-payload.json"
@@ -36,7 +36,7 @@ if [ ! -s "$PAYLOAD" ]; then
   exit 1
 fi
 
-RESPONSE=$(curl -s -X POST "$VPS_URL/api/external-usage" \
+RESPONSE=$(curl -s -X POST "$DASHBOARD_URL/api/external-usage" \
   -H 'Content-Type: application/json' \
   -d @"$PAYLOAD")
 

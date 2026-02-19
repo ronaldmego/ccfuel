@@ -15,7 +15,7 @@ function getClaudeUsage(debug = false) {
       name: 'xterm-256color',
       cols: 120,
       rows: 40,
-      cwd: process.env.HOME + '/projects/claude-code-usage-dashboard',
+      cwd: __dirname,
       env: { ...process.env, TERM: 'xterm-256color' }
     });
     

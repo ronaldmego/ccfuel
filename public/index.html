@@ -1293,7 +1293,7 @@
     let cachedAllBlocks = null; // VPS + external blocks, set by loadData()
     let weeklyHistoryCache = null; // Weekly history array, set by loadWeeklyHistory()
 
-    const PANAMA_OFFSET = -5;
+    let TZ_OFFSET = -5; // default, overridden by /api/config
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
@@ -1307,13 +1307,14 @@
       });
     });
 
-    // Central Panama time helper — all dates go through here
-    function getPanamaDate(date) {
+    // Central local time helper — all dates go through here
+    function getLocalDate(date) {
       const d = date || new Date();
       const utcMs = d.getTime();
-      const panamaMs = utcMs + (PANAMA_OFFSET * 3600000);
-      return new Date(panamaMs);
+      return new Date(utcMs + (TZ_OFFSET * 3600000));
     }
+    // Legacy alias
+    const getPanamaDate = getLocalDate;
 
     // Get today's date string in Panama timezone (YYYY-MM-DD)
     function getPanamaTodayISO() {
@@ -1375,7 +1376,7 @@
     function getLocalHour(utcDateStr) {
       const d = new Date(utcDateStr);
       const utcHour = d.getUTCHours();
-      let localHour = utcHour + PANAMA_OFFSET;
+      let localHour = utcHour + TZ_OFFSET;
       if (localHour < 0) localHour += 24;
       return localHour;
     }
@@ -2358,10 +2359,14 @@
       }
     }
 
-    // Load blocks + history first, then global usage (which needs them for pace comparison)
-    Promise.all([loadData(), loadWeeklyHistory()]).then(() => {
-      loadGlobalUsage();
-      loadPatternsTab();
+    // Load config (timezone) first, then data
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      if (cfg.tzOffset != null) TZ_OFFSET = cfg.tzOffset;
+    }).catch(() => {}).finally(() => {
+      Promise.all([loadData(), loadWeeklyHistory()]).then(() => {
+        loadGlobalUsage();
+        loadPatternsTab();
+      });
     });
     setInterval(loadData, 2 * 60 * 1000);
     setInterval(loadGlobalUsage, 5 * 60 * 1000);
