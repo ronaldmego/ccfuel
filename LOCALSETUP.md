@@ -1,38 +1,40 @@
-# Token Dashboard - Setup Laptop (Windows)
+# Multi-Machine Sync Setup
 
-Configuracion para sincronizar datos de uso de Claude Code desde la laptop al VPS.
+> **Optional.** Only needed if you run Claude Code on more than one machine and want to see combined usage in a single dashboard.
+
+How to sync usage data from a remote machine (e.g., laptop) to the machine running the dashboard.
 
 ---
 
-## Como Funciona
+## How It Works
 
-La laptop genera logs de Claude Code en `~/.claude/`. El script `push-usage.sh` ejecuta ccusage localmente, empaqueta los datos (blocks + daily) en JSON, y los sube al VPS via `POST /api/external-usage`. El dashboard combina automaticamente datos VPS + laptop.
+Each machine running Claude Code generates logs in `~/.claude/`. The script `push-usage.sh` runs ccusage locally on the remote machine, packages the data (blocks + daily) as JSON, and POSTs it to the dashboard via `POST /api/external-usage`. The dashboard automatically combines local + remote data.
 
 ```
-Laptop                          VPS
+Remote machine                  Dashboard server
 ~/.claude/*.jsonl
-    │
-    ▼
+    |
+    v
 ccusage (blocks+daily)
-    │
-    ▼
+    |
+    v
 push-usage.sh
-    │
-    ├──POST /api/external-usage──▶ data/external/laptop.json
-    │                                    │
-    │                                    ▼
-    │                              Dashboard (merged)
+    |
+    |--POST /api/external-usage-->  data/external/<source>.json
+    |                                    |
+    |                                    v
+    |                              Dashboard (merged view)
 ```
 
 ---
 
-## Metodos de Sincronizacion
+## Sync Methods
 
-### 1. Hook de Claude Code (principal)
+### 1. Claude Code Hook (recommended)
 
-Se ejecuta automaticamente al terminar cualquier sesion de Claude Code.
+Runs automatically at the end of every Claude Code session.
 
-**Configuracion:** `~/.claude/settings.json`
+**Configuration:** `~/.claude/settings.json` on the remote machine
 
 ```json
 {
@@ -43,7 +45,7 @@ Se ejecuta automaticamente al terminar cualquier sesion de Claude Code.
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME/APPs/claude-dashboard/scripts/push-usage.sh\"",
+            "command": "bash \"$HOME/path/to/scripts/push-usage.sh\"",
             "timeout": 120
           }
         ]
@@ -53,81 +55,84 @@ Se ejecuta automaticamente al terminar cualquier sesion de Claude Code.
 }
 ```
 
-- **Matcher vacio** = se ejecuta en todas las sesiones (cualquier proyecto)
-- **Timeout 120s** = suficiente para ccusage + upload
-- No hay duplicados: el VPS sobreescribe `laptop.json` cada vez
+- **Empty matcher** = runs for all sessions (any project)
+- **Timeout 120s** = enough for ccusage + upload
+- No duplicates: the dashboard overwrites the source file each time
 
-### 2. Task Scheduler (backup diario)
+### 2. Scheduled Task (backup)
 
-Ejecuta el mismo script una vez al dia como safety net.
+Run the same script on a schedule as a safety net.
 
-| Campo | Valor |
-|-------|-------|
-| Nombre tarea | `PushCcusageToVPS` |
-| Horario | 23:00 diario |
-| Ejecuta | `bash push-usage.sh` |
-
-**Comandos utiles:**
+**Linux/macOS (cron):**
 
 ```bash
-# Ver estado
-MSYS_NO_PATHCONV=1 schtasks /query /tn "PushCcusageToVPS"
-
-# Ejecutar manualmente
-MSYS_NO_PATHCONV=1 schtasks /run /tn "PushCcusageToVPS"
-
-# Eliminar
-MSYS_NO_PATHCONV=1 schtasks /delete /tn "PushCcusageToVPS" /f
+# Run daily at 11pm
+0 23 * * * bash /path/to/scripts/push-usage.sh
 ```
 
-Nota: `MSYS_NO_PATHCONV=1` es necesario en Git Bash para que no convierta `/tn` en rutas.
+**Windows (Task Scheduler):**
+
+| Field | Value |
+|-------|-------|
+| Task name | `PushCcusageToServer` |
+| Schedule | 23:00 daily |
+| Runs | `bash push-usage.sh` |
+
+```bash
+# Check status (Git Bash)
+MSYS_NO_PATHCONV=1 schtasks /query /tn "PushCcusageToServer"
+
+# Run manually
+MSYS_NO_PATHCONV=1 schtasks /run /tn "PushCcusageToServer"
+```
+
+Note: `MSYS_NO_PATHCONV=1` is needed in Git Bash to prevent path conversion of `/tn`.
 
 ### 3. Manual
 
 ```bash
-bash ~/APPs/claude-dashboard/scripts/push-usage.sh
+bash /path/to/scripts/push-usage.sh
 ```
 
 ---
 
 ## Script: push-usage.sh
 
-**Ubicacion:** `scripts/push-usage.sh`
+**Location:** `scripts/push-usage.sh`
 
-Flujo:
-1. Ejecuta `npx ccusage@latest blocks --json` y `daily --json`
-2. Guarda en archivos temporales (evita "argument list too long")
-3. Construye payload JSON via Node.js
-4. POST a `http://<VPS_URL>/api/external-usage` (set `VPS_URL` env var in the script)
-5. Log en `$TEMP/push-usage.log`
+Flow:
+1. Runs `npx ccusage@latest blocks --json` and `daily --json`
+2. Saves to temp files (avoids "argument list too long")
+3. Builds JSON payload via Node.js
+4. POSTs to `http://<DASHBOARD_URL>/api/external-usage` (set `DASHBOARD_URL` env var in the script)
+5. Logs to `$TEMP/push-usage.log`
 
-**Requisitos:** Node.js, npx, curl, acceso Tailscale al VPS.
+**Requirements:** Node.js, npx, curl, network access to the dashboard server.
 
 ---
 
 ## Troubleshooting
 
 ```bash
-# Ver log del ultimo push
+# Check last push log
 cat "$TEMP/push-usage.log"
 
-# Test manual
-bash ~/APPs/claude-dashboard/scripts/push-usage.sh
+# Manual test
+bash /path/to/scripts/push-usage.sh
 
-# Verificar datos en VPS (replace with your VPS_URL)
+# Verify data on dashboard server
 curl -s http://localhost:3400/api/external-usage | node -e "
   let d='';process.stdin.on('data',c=>d+=c);
   process.stdin.on('end',()=>{
     const j=JSON.parse(d);
-    const s=j.sources?.laptop;
-    if(!s) return console.log('No laptop data on VPS');
-    console.log('Updated:', s.lastUpdate);
-    console.log('Daily entries:', s.daily.daily.length);
-    console.log('Block entries:', s.blocks.blocks.length);
+    Object.keys(j.sources||{}).forEach(s => {
+      const src=j.sources[s];
+      console.log(s+': updated '+src.lastUpdate+', daily entries: '+src.daily.daily.length);
+    });
   });
 "
 
-# Verificar hook esta configurado
+# Verify hook is configured (on remote machine)
 cat ~/.claude/settings.json | node -e "
   let d='';process.stdin.on('data',c=>d+=c);
   process.stdin.on('end',()=>{
@@ -136,11 +141,8 @@ cat ~/.claude/settings.json | node -e "
     console.log('SessionEnd hooks:', h ? h.length : 'NONE');
   });
 "
-
-# Verificar Task Scheduler
-MSYS_NO_PATHCONV=1 schtasks /query /tn "PushCcusageToVPS"
 ```
 
 ---
 
-*Documento atemporal — Solo info constante*
+*Timeless document — setup instructions only*

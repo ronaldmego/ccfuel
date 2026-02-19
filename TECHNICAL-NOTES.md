@@ -87,13 +87,13 @@ Esto es una aproximacion. Si Claude dice 40% usado y nosotros medimos 10M tokens
 
 ## Fuentes de Datos y Merge
 
-### VPS (local)
+### Local (maquina principal)
 
-ccusage parsea `~/.claude/*.jsonl` directamente en el VPS. Datos frescos cada 5 min.
+ccusage parsea `~/.claude/*.jsonl` directamente en la maquina donde corre el dashboard. Datos frescos cada 5 min.
 
-### Laptop (externo)
+### Remoto (maquinas adicionales, opcional)
 
-`push-usage.sh` ejecuta ccusage en la laptop y envia JSON via POST:
+`push-usage.sh` ejecuta ccusage en la maquina remota y envia JSON via POST:
 
 ```
 POST /api/external-usage
@@ -104,12 +104,12 @@ POST /api/external-usage
 }
 ```
 
-Guardado en `data/external/laptop.json`. El frontend hace merge sumando VPS + externos.
+Guardado en `data/external/<source>.json`. El frontend hace merge sumando local + remotos.
 
 ### Merge en charts
 
-- **Chart diario**: Para cada fecha, suma `realTokens` de VPS + `realTokens` de cada fuente externa
-- **Chart horario**: Agrega bloques por hora del dia (timezone Panama UTC-5), VPS + externos stacked
+- **Chart diario**: Para cada fecha, suma `realTokens` de local + `realTokens` de cada fuente remota
+- **Chart horario**: Agrega bloques por hora del dia (timezone Panama UTC-5), local + remotos stacked
 - **Stats cards**: Suma gasolina real de todas las fuentes
 
 ---
@@ -317,7 +317,7 @@ Renderizado como HTML/CSS grid (no Chart.js matrix — ese plugin no alineaba la
 
 **Colores:** Verde (#4ade80) con alpha proporcional a `val / maxVal`. Celdas sin actividad: gris minimo. Dias futuros: casi invisible.
 
-**Combina:** VPS + laptop (todos los bloques mezclados antes de construir la matriz).
+**Combina:** Local + remoto (todos los bloques mezclados antes de construir la matriz).
 
 ### Comparacion Semana Actual vs Anterior
 
@@ -363,8 +363,8 @@ Archivo `data/usage-curve.json` con snapshots periodicos del % global.
 
 | Fuente | Visible | Razon |
 |--------|---------|-------|
-| Claude Code en VPS | Si | Logs locales en ~/.claude/ |
-| Claude Code en laptop | Si | Sync via push-usage.sh |
+| Claude Code local | Si | Logs locales en ~/.claude/ |
+| Claude Code remoto | Si | Sync via push-usage.sh (opcional) |
 | Claude.ai web | No | No genera logs JSONL |
 | API calls directas | No | No pasan por Claude Code |
 | Cursor, Continue, etc. | No | Apps terceras no generan logs compatibles |
