@@ -2074,8 +2074,18 @@
           const barWidth = Math.min(pct, 100);
           const isCurrent = i === 0;
 
+          // Compute week end date (start + 7 days)
+          const startDate = new Date(w.weekId + 'T00:00:00Z');
+          const endDate = new Date(startDate);
+          endDate.setUTCDate(endDate.getUTCDate() + 7);
+          const startStr = (startDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + startDate.getUTCDate().toString().padStart(2,'0');
+          const endStr = (endDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + endDate.getUTCDate().toString().padStart(2,'0');
+          const weekLabel = isCurrent
+            ? startStr + ' → hoy <span style="font-size:0.7em;color:#a78bfa">actual</span>'
+            : startStr + ' → ' + endStr;
+
           return `<tr${isCurrent ? ' style="background:rgba(255,255,255,0.03)"' : ''}>
-            <td style="white-space:nowrap;">${w.weekId.slice(5)}${isCurrent ? ' <span style="font-size:0.7em;color:#a78bfa">actual</span>' : ''}</td>
+            <td style="white-space:nowrap;">${weekLabel}</td>
             <td>${w.dayNum}/7</td>
             <td>
               <span class="eff-week-bar" style="width:${barWidth * 0.6}px; background:${barColor};"></span>
