@@ -1,99 +1,97 @@
-# Limitaciones Conocidas - Token Dashboard
+# Known Limitations
 
-Este documento explica las limitaciones técnicas del dashboard y su fuente de datos.
-
----
-
-## Fuente de Datos: ccusage
-
-El dashboard usa **ccusage** para obtener datos de uso de Claude.
-
-| Aspecto | Detalle |
-|---------|---------|
-| **Herramienta** | ccusage (github.com/ryoppippi/ccusage) |
-| **Autor** | ryoppippi (comunidad, NO Anthropic) |
-| **Licencia** | MIT (open source) |
-| **Cómo funciona** | Lee archivos JSONL locales de `~/.claude/` |
+Technical limitations of the dashboard and its data sources.
 
 ---
 
-## ⚠️ Qué NO Ve ccusage
+## Data Source: ccusage
 
-ccusage **solo lee logs locales de Claude Code/CLI**. No captura:
+The dashboard uses **ccusage** to get Claude Code usage data.
 
-| Fuente | ¿Visible? | Razón |
-|--------|-----------|-------|
-| Claude Code en este VPS | ✅ Sí | Logs locales en `~/.claude/` |
-| OpenClaw en este VPS | ✅ Sí | Usa Claude Code internamente |
-| Claude Code en laptop | ✅ Sí | Sync via push-usage.sh → POST /api/external-usage |
-| Claude.ai web | ❌ No | No genera logs JSONL locales |
-| API calls directas | ❌ No | No pasan por Claude Code |
-| Cursor, Continue, etc. | ❌ No | Apps terceras no usan Claude Code |
+| Aspect | Detail |
+|--------|--------|
+| **Tool** | ccusage (github.com/ryoppippi/ccusage) |
+| **Author** | ryoppippi (community, NOT Anthropic) |
+| **License** | MIT (open source) |
+| **How it works** | Reads local JSONL files from `~/.claude/` |
 
 ---
 
-## Impacto en el Dashboard
+## What ccusage Does NOT See
 
-### Tokens Subestimados (fuentes no integradas)
+ccusage **only reads local Claude Code/CLI logs**. It does not capture:
 
-El conteo de tokens refleja VPS + laptop (via sync). No incluye Claude.ai web ni API directas. El % semanal de Claude `/usage` SI incluye todo.
+| Source | Visible? | Reason |
+|--------|----------|--------|
+| Claude Code on this machine | Yes | Local logs in `~/.claude/` |
+| Claude Code on remote machines | Yes (with sync) | Via push-usage.sh -> POST /api/external-usage |
+| Claude.ai web | No | Does not generate local JSONL logs |
+| Direct API calls | No | Do not go through Claude Code |
+| Cursor, Continue, etc. | No | Third-party apps don't use Claude Code |
 
 ---
 
-## Cómo Ver Consumo Global
+## Impact on the Dashboard
 
-Para ver **todo** el consumo de tu cuenta Anthropic (sin importar la fuente):
+### Underestimated Tokens (non-integrated sources)
 
-1. **Anthropic Console** (recomendado)
+The token count reflects the local machine + any synced remote machines. It does not include Claude.ai web or direct API usage. The weekly % from Claude `/usage` DOES include everything.
+
+---
+
+## How to See Global Usage
+
+To see **all** usage on your Anthropic account (regardless of source):
+
+1. **Anthropic Console** (recommended)
    - URL: https://console.anthropic.com
-   - Sección: Usage
-   - Ve todo: API, Claude.ai, cualquier integración
+   - Section: Usage
+   - Shows everything: API, Claude.ai, any integration
 
-2. **Sincronizar logs de múltiples máquinas** (avanzado)
-   - Copiar `~/.claude/` de cada máquina al VPS
-   - ccusage leería todos los logs combinados
-   - Requiere rsync o similar
+2. **Sync logs from multiple machines** (advanced)
+   - Set up `push-usage.sh` on each remote machine (see `LOCALSETUP.md`)
+   - The dashboard merges all sources automatically
 
 ---
 
 ## Timezone: Hardcoded UTC-5
 
-El dashboard asume **Panama (UTC-5)** como timezone fijo. No usa DST ni detecta el timezone del usuario.
+The dashboard assumes **Panama (UTC-5)** as a fixed timezone. It does not use DST or detect the user's timezone.
 
-| Aspecto | Estado |
-|---------|--------|
-| Hora de reset semanal | Interpretada como Panama time |
-| "Gastado Hoy" | Dia calculado en Panama time |
-| Charts por hora | Bloques agrupados por hora Panama |
-| Browser en otra zona | Sin impacto — no depende del timezone del browser |
+| Aspect | Status |
+|--------|--------|
+| Weekly reset time | Interpreted as Panama time |
+| "Spent Today" | Day calculated in Panama time |
+| Hourly charts | Blocks grouped by Panama hour |
+| Browser in other timezone | No impact — does not depend on browser timezone |
 
-Si cambiaras de residencia a otra zona horaria, habria que actualizar `PANAMA_OFFSET` en `index.html` y el equivalente en `server.js`.
+To use a different timezone, update `PANAMA_OFFSET` in `index.html` and the equivalent in `server.js`.
 
-### Bug historico: getTimezoneOffset
+### Historical bug: getTimezoneOffset
 
-Antes de la correccion, el frontend usaba `now.getTimezoneOffset()` del browser para calcular Panama time. Esto hacia que los calculos dependieran del timezone del browser y produjeran resultados incorrectos si el browser no estaba en UTC. Se corrigio usando offset directo desde UTC. Ver `TECHNICAL-NOTES.md` seccion Timezone para detalles.
-
----
-
-## Métricas Afectadas
-
-| Métrica | Afectada | Notas |
-|---------|----------|-------|
-| Gasolina semanal | ⚠️ Parcial | VPS + laptop, no incluye web/API |
-| % Semanal (Claude /usage) | ✅ Completo | Fuente de verdad, incluye todo |
-| Eficiencia semanal | ✅ Completo | Basado en % de Claude |
+Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to calculate Panama time. This made calculations depend on the browser's timezone and produced incorrect results if the browser was not in UTC. Fixed by using direct offset from UTC. See `TECHNICAL-NOTES.md` Timezone section for details.
 
 ---
 
-## Recomendaciones
+## Affected Metrics
 
-1. **Confia en el % de Claude /usage** como fuente de verdad del consumo global
-2. **Los tokens reales de ccusage** son complementarios — miden VPS + laptop pero no web/API
-3. **Revisa Anthropic Console** si necesitas desglose exacto por fuente
+| Metric | Affected | Notes |
+|--------|----------|-------|
+| Weekly fuel (tokens) | Partial | Local + synced machines, excludes web/API |
+| Weekly % (Claude /usage) | Complete | Source of truth, includes everything |
+| Weekly efficiency | Complete | Based on Claude % |
 
 ---
 
-## Referencias
+## Recommendations
+
+1. **Trust the Claude /usage %** as the source of truth for global usage
+2. **ccusage real tokens** are complementary — they measure local + synced machines but not web/API
+3. **Check Anthropic Console** if you need an exact breakdown by source
+
+---
+
+## References
 
 - ccusage repo: https://github.com/ryoppippi/ccusage
 - ccusage npm: https://www.npmjs.com/package/ccusage
@@ -101,4 +99,4 @@ Antes de la correccion, el frontend usaba `now.getTimezoneOffset()` del browser 
 
 ---
 
-*Última actualización: 2026-02-11*
+*Timeless document — limitations only*

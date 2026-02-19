@@ -1,4 +1,4 @@
-# 📊 Claude Code Usage Dashboard
+# Claude Code Usage Dashboard
 
 Real fuel monitoring for Claude Code. Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
 
@@ -10,19 +10,19 @@ Claude Code has a weekly token limit. Burn it all and you're locked out until re
 
 **What it tells you:**
 
-- 🔥 **How much fuel is left** — Real weekly % (direct from Claude `/usage`)
-- 📈 **Your burn rate** — Weekly pace with alerts if you're running hot
-- 📅 **When you'll run out** — Projected depletion day
-- 💰 **Daily real cost** — Actual tokens, not inflated with cache reads
+- **How much fuel is left** — Real weekly % (direct from Claude `/usage`)
+- **Your burn rate** — Weekly pace with alerts if you're running hot
+- **When you'll run out** — Projected depletion day
+- **Daily real cost** — Actual tokens, not inflated with cache reads
 
 ## What It Measures (and What It Doesn't)
 
 | Token Type | Counted? | Why |
 |-----------|----------|-----|
-| outputTokens | ✅ Yes | What Claude generates — costs quota |
-| inputTokens | ✅ Yes | New context — costs quota |
-| cacheCreationTokens | ✅ Yes | First cache write — costs quota |
-| **cacheReadTokens** | ❌ **No** | ~96% of volume, free or near-free |
+| outputTokens | Yes | What Claude generates — costs quota |
+| inputTokens | Yes | New context — costs quota |
+| cacheCreationTokens | Yes | First cache write — costs quota |
+| **cacheReadTokens** | **No** | ~96% of volume, free or near-free |
 
 **Formula:** `realTokens = totalTokens - cacheReadTokens`
 
@@ -43,6 +43,8 @@ Process Manager: PM2 (optional)
 
 ## Quick Start
 
+Works on any machine where Claude Code is installed. Reads `~/.claude/` logs automatically.
+
 ```bash
 # Clone
 git clone https://github.com/ronaldmego/claude-code-usage-dashboard.git
@@ -51,19 +53,24 @@ cd claude-code-usage-dashboard
 # Install
 npm install
 
-# Configure
-cp .env.example .env
-# Edit .env — set host, port, and path to Claude logs
-
 # Run
 node server.js
-# Or with PM2:
-pm2 start server.js --name token-dashboard
 ```
 
-Open `http://localhost:3400` in your browser.
+Open `http://localhost:3400` in your browser. That's it — the dashboard reads your local Claude Code logs and fetches account-level usage via PTY automatically.
 
-## Configuration
+### Optional: PM2 for background running
+
+```bash
+pm2 start server.js --name claude-usage-dashboard
+```
+
+### Optional: Custom configuration
+
+```bash
+cp .env.example .env
+# Edit .env — set host, port, etc.
+```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -73,21 +80,34 @@ Open `http://localhost:3400` in your browser.
 
 ## Architecture
 
+### Single machine (default)
+
 ```
-Local machine (~/.claude/*.jsonl)  ──▶  ccusage  ──▶  server.js  ──▶  Dashboard
-                                                          ▲
-Remote machines (push-usage.sh)  ──POST /api/external-usage──┘
-                                                          │
-Claude Code (/usage PTY)  ──▶  claude-usage.js  ──────────┘
+~/.claude/*.jsonl  ──>  ccusage (parser)  ──>  server.js  ──>  Dashboard
+                                                   ^
+Claude Code (/usage PTY)  ──>  claude-usage.js  ───┘
 ```
 
-- **Local**: ccusage parses JSONL logs every 5 min
-- **Remote**: `push-usage.sh` runs ccusage locally and POSTs data to the dashboard
-- **Claude /usage**: PTY wrapper runs the real command to get account-level %
+- **ccusage** parses your local JSONL logs every 5 min for token breakdowns
+- **claude-usage.js** runs Claude Code's `/usage` command via PTY to get account-level percentages
+
+### Multi-machine (optional)
+
+If you use Claude Code on multiple machines, remote instances can push their data to a central dashboard:
+
+```
+Remote machine  ──>  push-usage.sh  ──POST /api/external-usage──>  Dashboard (merged)
+```
+
+See [Multi-Machine Sync](#multi-machine-sync) below.
 
 ## Multi-Machine Sync
 
-See `LOCALSETUP.md` for setting up automatic sync from laptop/other machines.
+> **Optional.** Only needed if you run Claude Code on more than one machine.
+
+If you have multiple machines (e.g., a laptop and a server), you can sync usage data from remote machines to a central dashboard instance. The script `push-usage.sh` runs ccusage locally on the remote machine and POSTs the data.
+
+See `LOCALSETUP.md` for detailed setup instructions (hooks, scheduled tasks, troubleshooting).
 
 ## Documentation
 
@@ -95,7 +115,7 @@ See `LOCALSETUP.md` for setting up automatic sync from laptop/other machines.
 |------|----------|
 | `CLAUDE.md` | Guide for Claude Code (philosophy, architecture, commands) |
 | `TECHNICAL-NOTES.md` | Measurement methodology: real fuel vs cache reads |
-| `LOCALSETUP.md` | Laptop → server sync setup |
+| `LOCALSETUP.md` | Multi-machine sync setup (optional) |
 | `LIMITATIONS.md` | Known data source limitations |
 | `CHANGELOG.md` | Version history |
 
@@ -104,7 +124,7 @@ See `LOCALSETUP.md` for setting up automatic sync from laptop/other machines.
 - **Zero build step** — No React, no webpack. Vanilla JS + Chart.js.
 - **Single dependency** — Express. That's it.
 - **Real metrics only** — Cache reads are noise. We filter them out.
-- **Multi-machine** — Works with multiple Claude Code installations pushing data to one dashboard.
+- **Works anywhere** — Single machine by default, multi-machine if you need it.
 
 ## License
 
