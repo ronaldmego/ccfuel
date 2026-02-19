@@ -6,8 +6,8 @@ const { getClaudeUsage } = require('./claude-usage');
 
 const app = express();
 
-const PORT = 3400;
-const HOST = '100.64.216.28'; // Tailscale IP
+const PORT = process.env.DASHBOARD_PORT || 3400;
+const HOST = process.env.DASHBOARD_HOST || '127.0.0.1';
 const EXTERNAL_DIR = path.join(__dirname, 'data', 'external');
 const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
 const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');

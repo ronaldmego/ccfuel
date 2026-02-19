@@ -58,10 +58,9 @@ Ver `TECHNICAL-NOTES.md` para la explicacion completa del metodo de medicion, qu
 
 | Aspecto | Valor |
 |---------|-------|
-| URL | `http://100.64.216.28:3400` |
-| Acceso | Solo via Tailscale (privado) |
-| Directorio | `/home/adminmgo/projects/token-dashboard/` |
-| Puerto | 3400 (registrado) |
+| URL | `http://<DASHBOARD_HOST>:<DASHBOARD_PORT>` |
+| Acceso | Configurable (default: localhost) |
+| Puerto | Configurable via `DASHBOARD_PORT` (default: 3400) |
 | PM2 | `token-dashboard` |
 
 ---
@@ -75,11 +74,11 @@ pm2 restart token-dashboard
 # Ver logs
 pm2 logs token-dashboard --lines 50
 
-# Acceder (solo Tailscale)
-http://100.64.216.28:3400
+# Acceder
+http://localhost:3400
 
 # Forzar refresh de datos
-curl http://100.64.216.28:3400/api/refresh
+curl http://localhost:3400/api/refresh
 ```
 
 ---
@@ -184,7 +183,7 @@ npx ccusage@latest blocks --json
 npx ccusage@latest summary
 
 # Test API
-curl http://100.64.216.28:3400/api/data | jq '.daily.daily | length'
+curl http://localhost:3400/api/data | jq '.daily.daily | length'
 ```
 
 ### Troubleshooting
@@ -194,7 +193,7 @@ curl http://100.64.216.28:3400/api/data | jq '.daily.daily | length'
 pm2 status && pm2 restart token-dashboard && pm2 logs token-dashboard --err
 
 # Datos no actualizan
-curl http://100.64.216.28:3400/api/refresh && npx ccusage@latest summary
+curl http://localhost:3400/api/refresh && npx ccusage@latest summary
 
 # ccusage falla
 ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
@@ -225,7 +224,7 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 
 - **Frontend:** Editar `public/index.html`, refresh browser (no requiere restart)
 - **Backend:** Editar `server.js`, luego `pm2 restart token-dashboard`
-- **Siempre verificar** en http://100.64.216.28:3400
+- **Siempre verificar** en http://localhost:3400 (o tu host configurado)
 
 ### Mobile-friendly
 
@@ -243,11 +242,10 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 
 ## Seguridad
 
-- **Acceso restringido a Tailscale** — Solo accesible via IP `100.64.216.28`, no expuesto a internet
-- **Sin autenticacion** — No se requiere login porque Tailscale ya controla el acceso
+- **Bind address configurable** — Default `127.0.0.1` (localhost only). Set `DASHBOARD_HOST` for remote access
+- **Sin autenticacion** — No incluye login. Si se expone en red, usar VPN o reverse proxy con auth
 - **Sin datos sensibles** — El dashboard solo muestra metricas de consumo, no credenciales ni tokens de API
 - **PTY isolation** — `claude-usage.js` ejecuta Claude Code en un PTY aislado, solo lee `/usage`
-- **Puerto registrado** — Puerto 3400 en `~/maintenance/docs/infrastructure/port-registry.md`
 
 ### Limitaciones de Datos
 
@@ -266,8 +264,6 @@ ccusage solo ve logs JSONL locales. El VPS captura sus propios logs y la laptop 
 | Setup Laptop | `LOCALSETUP.md` (sync laptop → VPS, hooks, Task Scheduler) |
 | ccusage docs | https://github.com/ryoppippi/ccusage |
 | Chart.js | https://www.chartjs.org/docs/ |
-| VPS/Infra | `~/CLAUDE.md` |
-| Port Registry | `~/maintenance/docs/infrastructure/port-registry.md` |
 
 ---
 

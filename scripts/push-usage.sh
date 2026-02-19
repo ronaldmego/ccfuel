@@ -4,7 +4,7 @@
 # Hook:  Runs automatically via Claude Code SessionEnd hook
 # Cron:  Task Scheduler every 30 min as backup
 
-VPS_URL="http://100.64.216.28:3400"
+VPS_URL="${VPS_URL:-http://localhost:3400}"
 SOURCE="laptop"
 TMPDIR="${TEMP:-${TMP:-/tmp}}"
 PAYLOAD="$TMPDIR/ccusage-payload.json"

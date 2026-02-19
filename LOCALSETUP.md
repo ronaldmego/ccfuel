@@ -98,7 +98,7 @@ Flujo:
 1. Ejecuta `npx ccusage@latest blocks --json` y `daily --json`
 2. Guarda en archivos temporales (evita "argument list too long")
 3. Construye payload JSON via Node.js
-4. POST a `http://100.64.216.28:3400/api/external-usage`
+4. POST a `http://<VPS_URL>/api/external-usage` (set `VPS_URL` env var in the script)
 5. Log en `$TEMP/push-usage.log`
 
 **Requisitos:** Node.js, npx, curl, acceso Tailscale al VPS.
@@ -114,8 +114,8 @@ cat "$TEMP/push-usage.log"
 # Test manual
 bash ~/APPs/claude-dashboard/scripts/push-usage.sh
 
-# Verificar datos en VPS
-curl -s http://100.64.216.28:3400/api/external-usage | node -e "
+# Verificar datos en VPS (replace with your VPS_URL)
+curl -s http://localhost:3400/api/external-usage | node -e "
   let d='';process.stdin.on('data',c=>d+=c);
   process.stdin.on('end',()=>{
     const j=JSON.parse(d);
