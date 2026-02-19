@@ -12,6 +12,17 @@
 
 ---
 
+## Proyecto en Archon
+
+| Campo | Valor |
+|-------|-------|
+| Nombre | **Claude Code Usage Dashboard** |
+| Repo | `ronaldmego/claude-code-usage-dashboard` |
+
+Cada ticket de Archon DEBE tener su GitHub Issue asociado. El PR que cierra el ticket debe incluir `Closes #N` para auto-cerrar el issue en GitHub.
+
+---
+
 ## Vision y Filosofia
 
 **Monitoreo de gasolina real de Claude** — Los tokens de Claude son combustible finito que se resetea semanalmente. Este dashboard mide el consumo real para que alcance todos los dias.
