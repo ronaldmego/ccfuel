@@ -1,72 +1,115 @@
-# Claude Token Dashboard
+# 📊 Claude Code Usage Dashboard
 
-Monitoreo de gasolina real de Claude Code. Mide el consumo de tokens que realmente queman cuota semanal, ignorando cache reads (~96% del volumen) que no cuestan nada.
+Real fuel monitoring for Claude Code. Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
 
-## Por que existe
+> Stop guessing. Know exactly how much Claude Code fuel you have left.
 
-Claude Code tiene un limite semanal de tokens. Si lo agotas, te quedas sin acceso hasta el reset. Este dashboard te dice:
+## Why This Exists
 
-- **Cuanta gasolina queda** — % semanal real (directo de Claude `/usage`)
-- **A que ritmo vas** — Pace semanal con alerta si vas acelerado
-- **Cuando se agota** — Proyeccion del dia de agotamiento
-- **Cuanto quemas por dia** — Tokens reales, no inflados con cache reads
+Claude Code has a weekly token limit. Burn it all and you're locked out until reset. But ~96% of reported tokens are **cache reads** — they don't count against your quota. This dashboard separates signal from noise.
 
-## Que mide (y que NO)
+**What it tells you:**
 
-| Concepto | Incluido | Razon |
-|----------|----------|-------|
-| outputTokens | Si | Lo que Claude genera — cuesta cuota |
-| inputTokens | Si | Contexto nuevo — cuesta cuota |
-| cacheCreationTokens | Si | Primera escritura a cache — cuesta cuota |
-| **cacheReadTokens** | **NO** | ~96% del volumen, gratis o casi gratis |
+- 🔥 **How much fuel is left** — Real weekly % (direct from Claude `/usage`)
+- 📈 **Your burn rate** — Weekly pace with alerts if you're running hot
+- 📅 **When you'll run out** — Projected depletion day
+- 💰 **Daily real cost** — Actual tokens, not inflated with cache reads
+
+## What It Measures (and What It Doesn't)
+
+| Token Type | Counted? | Why |
+|-----------|----------|-----|
+| outputTokens | ✅ Yes | What Claude generates — costs quota |
+| inputTokens | ✅ Yes | New context — costs quota |
+| cacheCreationTokens | ✅ Yes | First cache write — costs quota |
+| **cacheReadTokens** | ❌ **No** | ~96% of volume, free or near-free |
 
 **Formula:** `realTokens = totalTokens - cacheReadTokens`
 
-Ver `TECHNICAL-NOTES.md` para la explicacion completa.
+See `TECHNICAL-NOTES.md` for the full methodology.
+
+## Screenshots
+
+_Coming soon_
 
 ## Stack
 
 ```
 Node.js + Express
-Frontend: Vanilla HTML/CSS/JS + Chart.js (un solo index.html)
-Datos: ccusage (parsea logs JSONL) + Claude /usage (via PTY)
-Process Manager: PM2
+Frontend: Vanilla HTML/CSS/JS + Chart.js (single index.html, no build step)
+Data: ccusage (parses JSONL logs) + Claude /usage (via PTY)
+Process Manager: PM2 (optional)
 ```
 
 ## Quick Start
 
 ```bash
-# En el VPS
+# Clone
+git clone https://github.com/ronaldmego/claude-code-usage-dashboard.git
+cd claude-code-usage-dashboard
+
+# Install
 npm install
+
+# Configure
+cp .env.example .env
+# Edit .env — set host, port, and path to Claude logs
+
+# Run
+node server.js
+# Or with PM2:
 pm2 start server.js --name token-dashboard
-
-# Acceder (solo via Tailscale)
-http://100.64.216.28:3400
 ```
 
-## Fuentes de datos
+Open `http://localhost:3400` in your browser.
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DASHBOARD_HOST` | `127.0.0.1` | Bind address |
+| `DASHBOARD_PORT` | `3400` | Server port |
+| `CLAUDE_LOGS_DIR` | `~/.claude` | Path to Claude Code JSONL logs |
+
+## Architecture
 
 ```
-VPS (~/.claude/*.jsonl)  ──▶  ccusage  ──▶  server.js  ──▶  Dashboard
-                                                ▲
-Laptop (push-usage.sh)  ──POST /api/external-usage──┘
-                                                │
-Claude Code (/usage PTY) ──▶  claude-usage.js ──┘
+Local machine (~/.claude/*.jsonl)  ──▶  ccusage  ──▶  server.js  ──▶  Dashboard
+                                                          ▲
+Remote machines (push-usage.sh)  ──POST /api/external-usage──┘
+                                                          │
+Claude Code (/usage PTY)  ──▶  claude-usage.js  ──────────┘
 ```
 
-- **VPS**: ccusage parsea logs JSONL locales cada 5 min
-- **Laptop**: `push-usage.sh` ejecuta ccusage local y envia datos via POST
-- **Claude /usage**: PTY wrapper ejecuta el comando real para obtener % de cuenta
+- **Local**: ccusage parses JSONL logs every 5 min
+- **Remote**: `push-usage.sh` runs ccusage locally and POSTs data to the dashboard
+- **Claude /usage**: PTY wrapper runs the real command to get account-level %
 
-## Sincronizacion Laptop
+## Multi-Machine Sync
 
-Ver `LOCALSETUP.md` para configurar la sincronizacion automatica desde laptop al VPS.
+See `LOCALSETUP.md` for setting up automatic sync from laptop/other machines.
 
-## Documentacion
+## Documentation
 
-| Archivo | Contenido |
-|---------|-----------|
-| `CLAUDE.md` | Guia para Claude Code (filosofia, arquitectura, comandos) |
-| `TECHNICAL-NOTES.md` | Metodologia de medicion: gasolina real vs cache reads |
-| `LOCALSETUP.md` | Configuracion de sync laptop → VPS |
-| `LIMITATIONS.md` | Limitaciones conocidas de las fuentes de datos |
+| File | Contents |
+|------|----------|
+| `CLAUDE.md` | Guide for Claude Code (philosophy, architecture, commands) |
+| `TECHNICAL-NOTES.md` | Measurement methodology: real fuel vs cache reads |
+| `LOCALSETUP.md` | Laptop → server sync setup |
+| `LIMITATIONS.md` | Known data source limitations |
+| `CHANGELOG.md` | Version history |
+
+## Design Philosophy
+
+- **Zero build step** — No React, no webpack. Vanilla JS + Chart.js.
+- **Single dependency** — Express. That's it.
+- **Real metrics only** — Cache reads are noise. We filter them out.
+- **Multi-machine** — Works with multiple Claude Code installations pushing data to one dashboard.
+
+## License
+
+MIT
+
+## Contributing
+
+PRs welcome! Open an issue first for major changes.
