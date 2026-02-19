@@ -8,6 +8,7 @@ const app = express();
 
 const PORT = process.env.DASHBOARD_PORT || 3400;
 const HOST = process.env.DASHBOARD_HOST || '127.0.0.1';
+const TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
 const EXTERNAL_DIR = path.join(__dirname, 'data', 'external');
 const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
 const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');
@@ -93,23 +94,21 @@ async function updateCache() {
 
 // Weekly history helpers — uses Claude's actual reset cycle
 function getWeekCycleInfo() {
-  // Panama time (UTC-5)
   const now = new Date();
-  const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
-  const panama = new Date(panamaMs);
+  const localMs = now.getTime() + (TZ_OFFSET * 60 * 60 * 1000);
+  const localNow = new Date(localMs);
 
   let nextReset;
   const weeklyResetsAt = globalUsageCache.data?.weekAll?.resetsAt;
 
   if (weeklyResetsAt) {
-    // Use actual reset date from Claude /usage (convert UTC to panama-shifted)
-    nextReset = new Date(new Date(weeklyResetsAt).getTime() + (-5 * 60 * 60 * 1000));
+    nextReset = new Date(new Date(weeklyResetsAt).getTime() + (TZ_OFFSET * 60 * 60 * 1000));
   } else {
     // Fallback: estimate using reset hour (only accurate on day before reset)
     const resetHour = globalUsageCache.data?.weekAll?.resetsAtHour ?? 10;
-    nextReset = new Date(panama);
+    nextReset = new Date(localNow);
     nextReset.setUTCHours(resetHour, 0, 0, 0);
-    if (panama >= nextReset) {
+    if (localNow >= nextReset) {
       nextReset.setUTCDate(nextReset.getUTCDate() + 1);
     }
   }
@@ -118,7 +117,7 @@ function getWeekCycleInfo() {
   const cycleStart = new Date(nextReset);
   cycleStart.setUTCDate(cycleStart.getUTCDate() - 7);
 
-  const elapsedMs = panama - cycleStart;
+  const elapsedMs = localNow - cycleStart;
   const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
   const dayNum = Math.min(Math.ceil(elapsedDays), 7);
 
@@ -381,6 +380,11 @@ app.get('/api/usage-curve', (req, res) => {
     try { data = JSON.parse(fs.readFileSync(USAGE_CURVE_FILE, 'utf8')); } catch (e) {}
   }
   res.json(data);
+});
+
+// Config API (expose settings to frontend)
+app.get('/api/config', (req, res) => {
+  res.json({ tzOffset: TZ_OFFSET });
 });
 
 // Weekly History API
