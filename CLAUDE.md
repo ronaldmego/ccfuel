@@ -19,7 +19,15 @@
 | Nombre | **Claude Code Usage Dashboard** |
 | Repo | `ronaldmego/claude-code-usage-dashboard` |
 
-Cada ticket de Archon DEBE tener su GitHub Issue asociado. El PR que cierra el ticket debe incluir `Closes #N` para auto-cerrar el issue en GitHub.
+Trabajo pendiente: ver [GitHub Issues](https://github.com/ronaldmego/claude-code-usage-dashboard/issues) del repo.
+Documentación técnica: ver proyecto en Archon (knowledge base, no task tracker).
+
+### Workflow para agentes
+
+1. Revisar **GitHub Issues** del repo para encontrar trabajo pendiente
+2. Crear branch, hacer cambios, abrir PR con `Closes #N`
+3. Dejar comentario en el GitHub Issue con resumen de cambios y archivos modificados
+4. No push directo a main — siempre PR
 
 ---
 
