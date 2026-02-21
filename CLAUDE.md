@@ -12,19 +12,9 @@
 
 ---
 
-## Proyecto en Archon
+## Workflow para agentes
 
-| Campo | Valor |
-|-------|-------|
-| Nombre | **Claude Code Usage Dashboard** |
-| Repo | `ronaldmego/claude-code-usage-dashboard` |
-
-Trabajo pendiente: ver [GitHub Issues](https://github.com/ronaldmego/claude-code-usage-dashboard/issues) del repo.
-Documentación técnica: ver proyecto en Archon (knowledge base, no task tracker).
-
-### Workflow para agentes
-
-1. Revisar **GitHub Issues** del repo para encontrar trabajo pendiente
+1. Revisar **[GitHub Issues](https://github.com/ronaldmego/claude-code-usage-dashboard/issues)** del repo para encontrar trabajo pendiente
 2. Crear branch, hacer cambios, abrir PR con `Closes #N`
 3. Dejar comentario en el GitHub Issue con resumen de cambios y archivos modificados
 4. No push directo a main — siempre PR
