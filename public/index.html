@@ -1894,13 +1894,20 @@
     }
 
     // Global Usage (Source of Truth)
-    async function loadGlobalUsage() {
+    async function loadGlobalUsage(retries = 3) {
       try {
         const statusEl = document.getElementById('global-usage-status');
         statusEl.textContent = 'Cargando...';
 
         const res = await fetch('/api/global-usage');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
+
+        // Retry if data looks empty (race condition with cache)
+        if ((!data.session || data.session.percent == null) && retries > 0) {
+          await new Promise(r => setTimeout(r, 2000));
+          return loadGlobalUsage(retries - 1);
+        }
 
         if (data.session && data.weekAll) {
           // Update values
@@ -1982,7 +1989,11 @@
         }
       } catch (e) {
         console.error('Error loading global usage:', e);
-        document.getElementById('global-usage-status').textContent = 'Error de conexion';
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 2000));
+          return loadGlobalUsage(retries - 1);
+        }
+        document.getElementById('global-usage-status').textContent = 'Error de conexion - refresca la pagina';
       }
     }
 

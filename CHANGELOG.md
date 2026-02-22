@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-02-21
+
+### Fix: Dashboard muestra 0% intermitentemente (#12)
+
+**Problema:** El dashboard mostraba 0% en todas las métricas de forma intermitente. Refrescar el navegador a veces lo arreglaba y otras no.
+
+**Causa:** El frontend hacía un solo fetch a `/api/global-usage` al cargar. Si la API respondía con data vacía (cache expirado, respuesta parcial, o API lenta), mostraba 0% sin reintentar.
+
+**Fix:** Retry con 3 intentos y 2s de espera en `loadGlobalUsage()`. Si después de 3 intentos falla, muestra mensaje de error en vez de 0% silencioso.
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/12
+
+---
+
 ## 2026-02-17
 
 ### Fix: Reset de sesion mostraba fecha del reset semanal (#1)
