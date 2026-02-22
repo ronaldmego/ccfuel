@@ -30,7 +30,16 @@ See `TECHNICAL-NOTES.md` for the full methodology.
 
 ## Screenshots
 
-_Coming soon_
+![Dashboard Overview](./screenshots/dashboard-overview.png)
+*Main dashboard showing real token consumption, weekly pace, and daily patterns*
+
+![Usage Patterns](./screenshots/usage-patterns.png)  
+*Activity heatmap and weekly comparison charts*
+
+![Efficiency Tracking](./screenshots/efficiency-tracking.png)
+*Billing cycle progress and weekly efficiency history*
+
+> **Note:** Screenshots will be added once browser automation is available. The dashboard is fully functional — run `node server.js` and visit `http://localhost:3400` to see it live.
 
 ## Stack
 
