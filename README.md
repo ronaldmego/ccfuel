@@ -39,8 +39,6 @@ See `TECHNICAL-NOTES.md` for the full methodology.
 ![Efficiency Tracking](./screenshots/efficiency-tracking.png)
 *Billing cycle progress and weekly efficiency history*
 
-> **Note:** Screenshots will be added once browser automation is available. The dashboard is fully functional — run `node server.js` and visit `http://localhost:3400` to see it live.
-
 ## Stack
 
 ```
