@@ -146,6 +146,10 @@ See `LOCALSETUP.md` for detailed setup instructions (hooks, scheduled tasks, tro
 - **Real metrics only** — Cache reads are noise. We filter them out.
 - **Works anywhere** — Single machine by default, multi-machine if you need it.
 
+## Note
+
+This is a personal project, open for anyone who wants to try it. Requires a **Claude Pro or Max subscription** with Claude Code installed and authenticated. The dashboard reads local log files and the CLI's built-in usage display to automate what you'd otherwise check manually.
+
 ## License
 
 MIT
