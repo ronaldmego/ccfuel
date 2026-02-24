@@ -15,9 +15,9 @@
 ## Workflow para agentes
 
 1. Revisar **[GitHub Issues](https://github.com/ronaldmego/claude-code-usage-dashboard/issues)** del repo para encontrar trabajo pendiente
-2. Crear branch, hacer cambios, abrir PR con `Closes #N`
-3. Dejar comentario en el GitHub Issue con resumen de cambios y archivos modificados
-4. No push directo a main — siempre PR
+2. **Cambios simples** (docs, README, typos, comentarios): commit directo a main, sin PR
+3. **Cambios de codigo**: Crear branch, hacer cambios, abrir PR con `Closes #N`
+4. Dejar comentario en el GitHub Issue con resumen de cambios y archivos modificados
 
 ---
 
