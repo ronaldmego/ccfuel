@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-02-26
+
+### Refactor: Dashboard 100% basado en deltas de % (sin ccusage)
+
+**Cambio mayor:** El dashboard ahora opera exclusivamente con snapshots de `Claude /usage` via PTY. Se elimino toda dependencia de ccusage, datos externos (laptop sync), y metricas basadas en tokens.
+
+**Backend (`server.js`):**
+- Eliminado: `runCcusage()`, `updateCache()`, `getWeekTokensFromBlocks()`, directorio `data/external/`
+- Nuevo: `computeUsageDeltas()` — calcula consumo derivado de deltas entre snapshots de % (rate, projection, daily, hourly, heatmap, curves por semana)
+- Nuevo endpoint: `GET /api/usage-deltas` — retorna todas las metricas derivadas
+- Nuevo endpoint: `GET /api/config` — retorna timezone
+
+**Frontend (`public/index.html`):**
+- Nuevo tab **Consumo** (principal): ritmo actual (%/hora), proyeccion de agotamiento, consumo diario (barras con colores por nivel), consumo por hora (48h), heatmap de intensidad (cyan)
+- Tab **Patrones**: ahora usa curvas de % acumulado (0-100%) en vez de tokens acumulados
+- Tab **Eficiencia**: simplificado a 3 columnas (semana, dia, % usado), sin tokens
+- Eliminados: charts de tokens, pace token-based, datos VPS+Laptop, ciclo de facturacion
+- Leyenda de colores en chart de Consumo Diario: cyan (≤10%), amarillo (>10%), rojo (>15%)
+
+**Docs (`CLAUDE.md`):**
+- Actualizado para reflejar arquitectura sin ccusage
+- Endpoints, metricas y estructura de archivos actualizados
+
 ## 2026-02-21
 
 ### Fix: Dashboard muestra 0% intermitentemente (#12)

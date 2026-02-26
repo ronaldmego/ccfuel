@@ -44,11 +44,9 @@ Solo medimos gasolina real. Todo lo demas es ruido.
 3. **Cuando se agota?** — Proyeccion de dia de agotamiento
 4. **Cuanta gasolina queme hoy/esta semana?** — Tokens reales (sin cache reads)
 
-### Fuentes de datos
+### Fuente de datos
 
-- **ccusage** — Parsea logs JSONL locales para bloques y tokens (VPS + laptop via sync)
-- **Claude /usage** — Fuente de verdad: porcentajes globales de la cuenta via PTY
-- **Datos externos** — Laptop sincroniza via `push-usage.sh` → POST `/api/external-usage`
+- **Claude /usage** — Fuente de verdad: porcentajes globales de la cuenta via PTY. Snapshots cada ~10 min en `data/usage-curve.json`
 
 ### Metodologia detallada
 
@@ -88,7 +86,7 @@ curl http://localhost:3400/api/refresh
 ```
 Node.js + Express
 Frontend: Vanilla HTML/CSS/JS + Chart.js
-Datos: ccusage (CLI tool) + Claude /usage (PTY)
+Datos: Claude /usage (PTY) — snapshots de % cada ~10 min
 Process Manager: PM2
 ```
 
@@ -98,14 +96,11 @@ Process Manager: PM2
 
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌─────────────┐
-│  ~/.claude/     │────▶│   ccusage    │────▶│   server.js │
-│  (JSONL logs)   │     │   (parser)   │     │   (Express) │
+│  Claude Code    │────▶│ claude-usage │────▶│   server.js │
+│  (/usage PTY)   │     │   (parser)   │     │   (Express) │
 └─────────────────┘     └──────────────┘     └──────────────┘
                                                      │
-┌─────────────────┐     ┌──────────────┐             │
-│  Claude Code    │────▶│ claude-usage │─────────────┤
-│  (/usage PTY)   │     │   (parser)   │             │
-└─────────────────┘     └──────────────┘             ▼
+                                                     ▼
                                              ┌─────────────┐
                                              │ index.html  │
                                              │ (Dashboard) │
@@ -116,19 +111,15 @@ Process Manager: PM2
 
 ```
 token-dashboard/
-├── server.js           # Express server + ccusage integration
+├── server.js           # Express server + PTY integration
 ├── claude-usage.js     # PTY wrapper para Claude /usage
 ├── public/
 │   └── index.html      # Dashboard (todo inline: HTML, CSS, JS)
-├── scripts/
-│   └── push-usage.sh   # Sync laptop → VPS (hook + cron)
 ├── data/
-│   ├── external/       # Datos externos (laptop.json, etc)
 │   ├── weekly-history.json  # Snapshots de eficiencia semanal
-│   └── usage-curve.json     # Snapshots periodicos de % (cada 5 min)
+│   └── usage-curve.json     # Snapshots periodicos de % (cada ~10 min)
 ├── CLAUDE.md           # Este archivo
 ├── TECHNICAL-NOTES.md  # Metodologia: gasolina real, que medimos, que ignoramos
-├── LOCALSETUP.md       # Setup laptop: hooks, Task Scheduler, sync
 ├── LIMITATIONS.md      # Limitaciones conocidas (IMPORTANTE)
 └── package.json
 ```
@@ -138,28 +129,27 @@ token-dashboard/
 | Endpoint | Metodo | Descripcion |
 |----------|--------|-------------|
 | `/` | GET | Dashboard HTML |
-| `/api/data` | GET | Datos cacheados ccusage (blocks + daily) |
-| `/api/refresh` | GET | Fuerza actualizacion de cache ccusage |
+| `/api/refresh` | GET | Redirige a `/api/global-usage/refresh` |
 | `/api/global-usage` | GET | **Uso global real** (Claude /usage via PTY) |
 | `/api/global-usage/refresh` | GET | Fuerza refresh de global usage |
-| `/api/external-usage` | POST | Recibe datos de fuentes externas (laptop) |
-| `/api/external-usage` | GET | Lista datos de todas las fuentes externas |
 | `/api/usage-curve` | GET | Snapshots periodicos de % (para comparacion semanal) |
+| `/api/usage-deltas` | GET | Consumo derivado de deltas de % (rate, projection, daily, hourly, heatmap, curves) |
 | `/api/weekly-history` | GET | Historial de eficiencia semanal |
+| `/api/config` | GET | Configuracion (timezone) |
 
 **Global Usage:** Ejecuta Claude Code via PTY (~15-20s), cache 5 min. Retorna session%, weekAll%, weekSonnet%, extraUsage.
-
-**Cache:** Datos en memoria, auto-refresh cada 5 min, `/api/refresh` fuerza actualizacion.
 
 **Usage Curve:** Cada fetch exitoso de global-usage guarda un snapshot en `data/usage-curve.json` (%, hora, dia del ciclo). Poda automatica: ultimos 28 dias.
 
 ### Metricas del Dashboard
 
-**Tab Overview:** Gauges de sesion y semanal (% restante), pace semanal (comparacion token-based vs semana anterior), charts de consumo diario (14 dias calendario) y por franja horaria. Solo tokens reales, sin cache reads.
+**Tab Consumo (principal):** Derivado de deltas de % via snapshots de /usage. Ritmo actual (%/hora, ultimas 6h), proyeccion de agotamiento, consumo diario (delta % por dia, 14 dias), consumo por hora (48h), heatmap de intensidad del ciclo actual (cyan). Fuente: `/api/usage-deltas`.
 
-**Tab Patrones:** Heatmap de actividad semanal (7 dias x 24 horas, CSS grid), comparacion de consumo semana actual vs anterior (Chart.js line chart, tokens acumulados).
+**Tab Overview:** Uso global (fuente de verdad: % sesion, semanal, sonnet), gauges de sesion y semanal (% restante). Fuente: `/api/global-usage`.
 
-**Tab Eficiencia:** Barra de ciclo de facturacion mensual (dias restantes + tokens ciclo), eficiencia semanal actual (% usado vs disponible, colores relativos al progreso del ciclo), historial de semanas anteriores, tokens combinados VPS+Laptop.
+**Tab Patrones:** Chart de lineas con % acumulado (0-100%) por hora del ciclo. Semana actual (verde) vs anterior (gris) vs ritmo ideal (purple). Fuente: `curves` en `/api/usage-deltas`.
+
+**Tab Eficiencia:** Eficiencia semanal actual (% usado vs disponible, colores relativos al progreso del ciclo), historial de semanas anteriores (3 columnas: semana, dia, % usado).
 
 ### Ventanas de Tiempo (ver TECHNICAL-NOTES.md)
 
@@ -175,13 +165,9 @@ pm2 restart token-dashboard
 pm2 logs token-dashboard
 pm2 status
 
-# ccusage directo (para debug)
-npx ccusage@latest daily --json
-npx ccusage@latest blocks --json
-npx ccusage@latest summary
-
 # Test API
-curl http://localhost:3400/api/data | jq '.daily.daily | length'
+curl http://localhost:3400/api/usage-deltas | jq '.curves | keys'
+curl http://localhost:3400/api/global-usage | jq '.weekAll.percent'
 ```
 
 ### Troubleshooting
@@ -191,10 +177,7 @@ curl http://localhost:3400/api/data | jq '.daily.daily | length'
 pm2 status && pm2 restart token-dashboard && pm2 logs token-dashboard --err
 
 # Datos no actualizan
-curl http://localhost:3400/api/refresh && npx ccusage@latest summary
-
-# ccusage falla
-ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
+curl http://localhost:3400/api/global-usage/refresh
 ```
 
 ---
@@ -204,9 +187,7 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 ### Convenciones
 
 - **Frontend inline** — Todo en un solo `index.html` (HTML, CSS, JS). No hay build step
-- **Solo gasolina real** — Siempre mostrar `totalTokens - cacheReadTokens`. Nunca inflar numeros con cache reads
-- **Consumo combinado** — VPS + Laptop, no hay separacion por usuario
-- **ccusage es externo** — No modificamos esa tool, solo la consumimos
+- **Solo % oficial** — Todo se mide con el % reportado por Claude /usage via PTY. No dependemos de ccusage ni logs JSONL
 - **PM2 para produccion** — Nunca `node server.js` directo
 - **Timezone Panama (UTC-5)** — Todas las fechas pasan por `getPanamaDate()`. Usar metodos UTC (`getUTCDate()`, `setUTCHours()`, etc). Nunca metodos locales del browser. Ver `TECHNICAL-NOTES.md` seccion Timezone
 - **Ciclo semanal rolling** — La semana de Claude NO es lun-dom. Es un ciclo de 7 dias con reset a una hora especifica (`weekAll.resetsAtHour`). Nunca asumir dia de semana fijo
@@ -232,9 +213,9 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 
 ### Agregar Nueva Metrica
 
-1. Modificar `loadData()` en `index.html` para calcular
-2. Agregar elemento HTML en la seccion correspondiente
-3. Actualizar en el ciclo de render
+1. Si es backend: agregar logica a `computeUsageDeltas()` en `server.js`
+2. Agregar elemento HTML en la seccion correspondiente de `index.html`
+3. Actualizar en la funcion de render del tab correspondiente
 
 ---
 
@@ -249,7 +230,7 @@ ls -la ~/.claude/*.jsonl && npx ccusage@latest --version
 
 **LEER:** `LIMITATIONS.md`
 
-ccusage solo ve logs JSONL locales. El VPS captura sus propios logs y la laptop sincroniza los suyos via `push-usage.sh` (ver `LOCALSETUP.md`). No captura: Claude.ai web ni API calls directas. Los "gaps" pueden ser falsos si se uso Claude desde otra fuente no integrada.
+El dashboard depende del % oficial de Claude /usage via PTY. El PTY tarda ~15-20s y puede fallar intermitentemente. Los snapshots se guardan cada ~10 min y se filtran anomalias (drops >3%, weekPercent=0). La resolucion de datos es limitada por la frecuencia de snapshots.
 
 ---
 
@@ -259,8 +240,6 @@ ccusage solo ve logs JSONL locales. El VPS captura sus propios logs y la laptop 
 |-----------|---------|
 | Metodologia de medicion | `TECHNICAL-NOTES.md` — Que medimos, que ignoramos, por que |
 | Limitaciones | `LIMITATIONS.md` |
-| Setup Laptop | `LOCALSETUP.md` (sync laptop → VPS, hooks, Task Scheduler) |
-| ccusage docs | https://github.com/ryoppippi/ccusage |
 | Chart.js | https://www.chartjs.org/docs/ |
 
 ---
