@@ -1,81 +1,50 @@
-// Claude Usage via PTY
-// Ejecuta claude, envía /usage, parsea el output
+// Claude Usage via CLI (non-interactive)
+// Runs `claude usage` and parses the text output
+// Falls back gracefully on auth errors
 
-const pty = require('node-pty');
-const os = require('os');
+const { execSync } = require('child_process');
 const fs = require('fs');
 
 function getClaudeUsage(debug = false) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     let output = '';
-    let resolved = false;
-    
-    // Spawn claude directly
-    const ptyProcess = pty.spawn('claude', [], {
-      name: 'xterm-256color',
-      cols: 120,
-      rows: 40,
-      cwd: __dirname,
-      env: { ...process.env, TERM: 'xterm-256color' }
-    });
-    
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        ptyProcess.kill();
-        if (debug) {
-          fs.writeFileSync('/tmp/claude-pty-debug.log', output);
-          console.log('Debug: timeout reached, output saved to /tmp/claude-pty-debug.log');
-        }
-        resolve(parseUsageOutput(output));
-      }
-    }, 20000);
+    let authError = false;
 
-    ptyProcess.onData((data) => {
-      output += data;
-      if (debug) {
-        process.stdout.write(data);
-      }
-    });
-    
-    ptyProcess.onExit(() => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        if (debug) {
-          fs.writeFileSync('/tmp/claude-pty-debug.log', output);
-        }
-        resolve(parseUsageOutput(output));
-      }
-    });
-    
-    // Sequence of commands with proper timing
-    setTimeout(() => {
-      if (debug) console.log('\n[DEBUG] Sending /usage...');
-      ptyProcess.write('/usage');
-    }, 3000);
-    
-    setTimeout(() => {
-      if (debug) console.log('\n[DEBUG] Pressing Enter to execute /usage...');
-      ptyProcess.write('\r');
-    }, 3500);
-    
-    setTimeout(() => {
-      if (debug) console.log('\n[DEBUG] Sending ESC to close panel...');
-      ptyProcess.write('\x1b');
-    }, 8000);
-    
-    setTimeout(() => {
-      if (debug) console.log('\n[DEBUG] Sending /exit...');
-      ptyProcess.write('/exit\r');
-    }, 9000);
+    try {
+      output = execSync('claude usage 2>&1', {
+        timeout: 30000,
+        encoding: 'utf-8',
+        env: { ...process.env, TERM: 'dumb', NO_COLOR: '1' }
+      });
+    } catch (err) {
+      output = err.stdout || err.stderr || err.message || '';
+      if (debug) console.error('claude usage failed:', err.message);
+    }
+
+    if (debug) {
+      console.log('Raw output:');
+      console.log(output);
+      fs.writeFileSync('/tmp/claude-usage-debug.log', output);
+    }
+
+    // Check for auth errors
+    if (/401|authentication_error|expired|OAuth token has expired/i.test(output)) {
+      authError = true;
+      if (debug) console.log('Auth error detected');
+    }
+
+    const result = parseUsageOutput(output);
+    result.authError = authError;
+    if (authError) {
+      result.errorMessage = 'OAuth token expired. Run: claude auth login';
+    }
+
+    resolve(result);
   });
 }
 
 function parseUsageOutput(output) {
-  // Remove ANSI escape codes — replace with spaces (not empty string)
-  // because cursor movement codes like [1C] represent visual spacing.
-  // Without this, "Resets[1C]Feb" becomes "ResetsFeb" instead of "Resets Feb".
+  // Clean ANSI codes
   const clean = output
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ' ')
     .replace(/\x1b\[[0-9;?]*[hlm]/g, ' ')
@@ -84,9 +53,6 @@ function parseUsageOutput(output) {
     .replace(/\s+/g, ' ');
 
   // --- Section-based parsing ---
-  // Instead of matching resets globally by position (fragile — if one fails
-  // to parse, all subsequent ones shift), we split the text by section headers
-  // and parse each section independently.
   const sectionDefs = [
     { key: 'session',    regex: /current\s+session/i },
     { key: 'weekAll',    regex: /current\s+week\s*\(?\s*all/i },
@@ -100,7 +66,6 @@ function parseUsageOutput(output) {
   }
   boundaries.sort((a, b) => a.index - b.index);
 
-  // Extract text for each section (from its header to the next header or end)
   const sectionTexts = {};
   for (let i = 0; i < boundaries.length; i++) {
     const start = boundaries[i].index;
@@ -108,23 +73,20 @@ function parseUsageOutput(output) {
     sectionTexts[boundaries[i].key] = clean.slice(start, end);
   }
 
-  // Parse percent and reset time from a section's text
   function parseSection(text) {
     if (!text) return { percent: 0, resetsAtHour: null, resetsAt: null };
 
     const pctMatch = text.match(/(\d+)%\s*used/i);
     const percent = pctMatch ? parseInt(pctMatch[1]) : 0;
 
-    // Reset time regex — applied per-section
-    // Minutes are optional: PTY sometimes rounds "4:59pm" → "5pm"
     const rstMatch = text.match(/Res\w*\s+(?:[\w,]*\s+)*?(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
 
     let resetsAtHour = null;
     let resetsAt = null;
 
     if (rstMatch) {
-      const monthStr = rstMatch[1]; // undefined if no date
-      const dayStr = rstMatch[2];   // undefined if no date
+      const monthStr = rstMatch[1];
+      const dayStr = rstMatch[2];
       let hour = parseInt(rstMatch[3]);
       const minute = rstMatch[4] != null ? parseInt(rstMatch[4]) : 0;
       const ampm = rstMatch[5].toLowerCase();
@@ -134,15 +96,12 @@ function parseUsageOutput(output) {
       resetsAtHour = hour;
 
       if (monthStr && dayStr) {
-        // Full date provided — convert Panama time to UTC
         const monthMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
         const month = monthMap[monthStr.toLowerCase().slice(0, 3)];
         const day = parseInt(dayStr);
         const year = new Date().getUTCFullYear();
-        // Panama is UTC-5, so add 5h to get UTC
         resetsAt = new Date(Date.UTC(year, month, day, hour + 5, minute, 0)).toISOString();
       } else {
-        // No date — reset is today or tomorrow (compute from current time)
         const now = new Date();
         const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
         const panama = new Date(panamaMs);
@@ -151,7 +110,6 @@ function parseUsageOutput(output) {
         if (panama >= resetDate) {
           resetDate.setUTCDate(resetDate.getUTCDate() + 1);
         }
-        // Convert panama-shifted back to real UTC
         resetsAt = new Date(resetDate.getTime() + 5 * 60 * 60 * 1000).toISOString();
       }
     }
@@ -163,7 +121,6 @@ function parseUsageOutput(output) {
   const weekAll = parseSection(sectionTexts.weekAll);
   const weekSonnet = parseSection(sectionTexts.weekSonnet);
 
-  // Check extra usage
   const extraEnabled = /extra usage enabled/i.test(clean) && !/not enabled/i.test(clean);
   const extraMatch = clean.match(/\$(\d+)\s*free/i);
 

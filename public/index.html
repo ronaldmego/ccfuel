@@ -1306,7 +1306,10 @@
           return loadGlobalUsage(retries - 1);
         }
 
-        if (data.session && data.weekAll) {
+        if (data.authError) {
+          statusEl.textContent = "⚠️ " + (data.errorMessage || "Auth error");
+          statusEl.style.color = "#f87171";
+        } else if (data.session && data.weekAll) {
           document.getElementById('global-session').textContent = data.session.percent + '%';
           document.getElementById('global-week').textContent = data.weekAll.percent + '%';
           document.getElementById('global-sonnet').textContent = data.weekSonnet.percent + '%';
