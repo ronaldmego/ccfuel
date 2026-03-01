@@ -1,45 +1,99 @@
-// Claude Usage via CLI (non-interactive)
-// Runs `claude usage` and parses the text output
-// Falls back gracefully on auth errors
+// Claude Usage via PTY (interactive)
+// Spawns claude interactively, sends /usage slash command, parses output
+// Requires node-pty (already a dependency)
 
-const { execSync } = require('child_process');
+const pty = require('node-pty');
 const fs = require('fs');
 
 function getClaudeUsage(debug = false) {
   return new Promise((resolve) => {
     let output = '';
-    let authError = false;
+    let settled = false;
+    const TOTAL_TIMEOUT = 35000;
 
-    try {
-      output = execSync('claude usage 2>&1', {
-        timeout: 30000,
-        encoding: 'utf-8',
-        env: { ...process.env, TERM: 'dumb', NO_COLOR: '1' }
-      });
-    } catch (err) {
-      output = err.stdout || err.stderr || err.message || '';
-      if (debug) console.error('claude usage failed:', err.message);
-    }
+    // Filter out CLAUDECODE env var to avoid nested session detection
+    const cleanEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) =>
+        k !== 'CLAUDECODE'
+      )
+    );
 
-    if (debug) {
-      console.log('Raw output:');
-      console.log(output);
-      fs.writeFileSync('/tmp/claude-usage-debug.log', output);
-    }
+    const term = pty.spawn('claude', [], {
+      name: 'xterm',
+      cols: 200,
+      rows: 50,
+      env: { ...cleanEnv, TERM: 'xterm', NO_COLOR: '1' }
+    });
 
-    // Check for auth errors
-    if (/401|authentication_error|expired|OAuth token has expired/i.test(output)) {
-      authError = true;
-      if (debug) console.log('Auth error detected');
-    }
+    const cleanup = () => {
+      if (!settled) {
+        settled = true;
+        try { term.kill(); } catch (_) {}
+      }
+    };
 
-    const result = parseUsageOutput(output);
-    result.authError = authError;
-    if (authError) {
-      result.errorMessage = 'OAuth token expired. Run: claude auth login';
-    }
+    // Timeout safety
+    const timer = setTimeout(() => {
+      if (debug) console.log('Timeout reached');
+      cleanup();
+      const result = parseUsageOutput(output);
+      result.errorMessage = result.success ? null : 'Timeout waiting for /usage output';
+      resolve(result);
+    }, TOTAL_TIMEOUT);
 
-    resolve(result);
+    term.onData((data) => {
+      output += data;
+
+      // Detect when /usage output is complete
+      if (output.includes('/usage') && (
+        /extra usage/i.test(output) &&
+        /resets/i.test(output) &&
+        /current\s+(session|week)/i.test(output)
+      )) {
+        setTimeout(() => {
+          if (!settled) {
+            clearTimeout(timer);
+            cleanup();
+
+            if (debug) {
+              console.log('Raw output captured');
+              fs.writeFileSync('/tmp/claude-usage-debug.log', output);
+            }
+
+            const result = parseUsageOutput(output);
+            resolve(result);
+          }
+        }, 2000);
+      }
+    });
+
+    term.onExit(() => {
+      if (!settled) {
+        clearTimeout(timer);
+        settled = true;
+        const result = parseUsageOutput(output);
+        if (!result.success) {
+          result.errorMessage = 'Claude exited before /usage completed';
+        }
+        resolve(result);
+      }
+    });
+
+    // Step 1: Wait for Claude to initialize (4s)
+    setTimeout(() => {
+      if (!settled) {
+        if (debug) console.log('Typing /usage...');
+        term.write('/usage');
+      }
+    }, 4000);
+
+    // Step 2: Wait for autocomplete menu to appear, then press Enter (1.5s later)
+    setTimeout(() => {
+      if (!settled) {
+        if (debug) console.log('Pressing Enter...');
+        term.write('\r');
+      }
+    }, 5500);
   });
 }
 
@@ -153,7 +207,7 @@ module.exports = { getClaudeUsage };
 
 if (require.main === module) {
   const debug = process.argv.includes('--debug');
-  console.log('Testing Claude usage fetch...' + (debug ? ' (debug mode)' : ''));
+  console.log('Testing Claude usage fetch via PTY...' + (debug ? ' (debug mode)' : ''));
   getClaudeUsage(debug)
     .then(result => {
       console.log('\n=== RESULT ===');
