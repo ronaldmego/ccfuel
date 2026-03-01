@@ -245,3 +245,38 @@ El dashboard depende del % oficial de Claude /usage via PTY. El PTY tarda ~15-20
 ---
 
 *Documento atemporal — Solo info constante*
+
+---
+
+## ⚠️ CRITICAL: claude-usage.js — Do Not Touch Without Testing
+
+`claude-usage.js` is the **single most critical file** in this project. It is the data extraction layer — without it, the entire dashboard shows 0% on everything. The UI is just presentation; this file is the engine.
+
+### How it works (as of 2026-03-01)
+
+```
+node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s for autocomplete → presses Enter → parses structured output → returns JSON with session%, weekAll%, weekSonnet%
+```
+
+### What can break it
+
+| Risk | Detail |
+|------|--------|
+| Claude CLI updates | Autocomplete timing, output format, or slash command behavior may change |
+| Env var `CLAUDECODE` | Must be filtered out or Claude refuses to start (nested session detection) |
+| PTY timing | 4s init + 1.5s autocomplete wait are empirical — too fast = autocomplete captures input, too slow = timeout |
+| Timeout (35s) | PTY takes ~20-25s to complete. If Claude is slow (high load), may timeout |
+| node-pty version | node-pty must match Node.js version. After Node upgrade, run `npm rebuild node-pty` |
+
+### Rules
+
+1. **Never change this file without running `node claude-usage.js --debug` first**
+2. **Check `/tmp/claude-usage-debug.log` for raw PTY output** if something looks wrong
+3. **If Claude CLI changes its `/usage` output format**, only `parseUsageOutput()` needs updating — the PTY spawn logic should remain stable
+4. **Test from PM2 context too** — env vars differ between interactive shell and PM2
+
+### History
+
+- **Pre-2026-03-01:** Used `execSync('claude usage')` which was never a valid CLI command. Worked by accident (parser extracted % from chatbot responses) until it stopped working.
+- **2026-03-01:** Rewritten to use node-pty with interactive `/usage` slash command. Fix confirmed: session 12%, weekAll 41%, weekSonnet 3%.
+

@@ -100,3 +100,32 @@ Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to 
 ---
 
 *Timeless document — limitations only*
+
+---
+
+## Data Extraction: PTY Dependency (CRITICAL)
+
+The dashboard's **sole data source** is the `/usage` slash command inside Claude Code, accessed via a PTY (pseudo-terminal) session using `node-pty`.
+
+### Why PTY (not CLI, not API, not OTel)
+
+| Alternative | Viable? | Reason |
+|-------------|---------|--------|
+| `claude usage` CLI subcommand | ❌ No | Does not exist — Claude interprets it as a chat prompt |
+| Anthropic API | ❌ No | No endpoint for account quota % |
+| OpenTelemetry | ❌ Partial | Exports tokens/costs per request, but NOT weekly quota % (the primary metric). Investigated 2026-03-01, not viable as replacement |
+| Claude `/usage` via PTY | ✅ Yes | Only source of `weekAll.percent`, `session.percent`, `weekSonnet.percent` |
+
+### Risks
+
+- **Fragile:** PTY timing is empirical (4s init, 1.5s autocomplete wait). Claude CLI updates can break it.
+- **Slow:** Each fetch takes ~20-25 seconds (spawn, init, command, parse, kill).
+- **One at a time:** Cannot run multiple PTY sessions simultaneously (Claude detects and rejects).
+- **Env-sensitive:** Must filter `CLAUDECODE` env var or Claude refuses to start.
+
+### Mitigation
+
+- 5-minute cache on successful fetches (avoids hammering PTY)
+- 35-second timeout with graceful fallback
+- Debug mode: `node claude-usage.js --debug` writes raw output to `/tmp/claude-usage-debug.log`
+

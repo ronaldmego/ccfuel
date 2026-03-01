@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-03-01
+
+### CRITICAL Fix: claude-usage.js rewritten from execSync to PTY (#18, #19)
+
+**Problema:** El dashboard mostraba 0% en todas las métricas desde hace días. `claude-usage.js` usaba `execSync('claude usage')` pero `claude usage` **no es un subcomando válido de Claude CLI**. Claude lo interpretaba como un prompt de chat y respondía con texto conversacional.
+
+**Causa raíz:** En algún momento Claude Code CLI eliminó o nunca tuvo el subcomando `usage`. La única forma de obtener datos de consumo es via el slash command `/usage` dentro de una sesión interactiva.
+
+**Fix (`claude-usage.js` — rewrite completo):**
+- Reemplazado `execSync('claude usage')` por spawn PTY interactivo via `node-pty`
+- Secuencia: spawn claude → esperar 4s init → escribir `/usage` → esperar 1.5s autocomplete → Enter → parsear output
+- Filtrado de env var `CLAUDECODE` para evitar detección de sesión anidada
+- `parseUsageOutput()` sin cambios — la salida de `/usage` es la misma
+- Timeout de seguridad 35s (PTY tarda ~20-25s en completar)
+
+**⚠️ ADVERTENCIA:** `claude-usage.js` es la pieza MÁS CRÍTICA del dashboard. Sin ella, nada funciona — el UI es solo presentación. NO tocar este archivo sin testing exhaustivo. Cualquier cambio en Claude Code CLI (autocomplete timing, output format, env vars) puede romperlo.
+
+**También resuelto:**
+- Dashboard bindeado a `100.64.216.28` (Tailscale) para acceso remoto
+- Cerrado issue #18 (bug report) via PR #19
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/18
+**PR:** https://github.com/ronaldmego/claude-code-usage-dashboard/pull/19
+
+
 ## 2026-02-26
 
 ### Refactor: Dashboard 100% basado en deltas de % (sin ccusage)
