@@ -1,17 +1,5 @@
 # Token Dashboard - Guia Claude Code
 
-## Tabla de Contenidos
-
-- [Vision y Filosofia](#vision-y-filosofia)
-- [Quick Start](#quick-start)
-- [Arquitectura](#arquitectura)
-- [Comandos Frecuentes](#comandos-frecuentes)
-- [Filosofia de Desarrollo](#filosofia-de-desarrollo)
-- [Seguridad](#seguridad)
-- [Recursos](#recursos)
-
----
-
 ## Workflow para agentes
 
 1. Revisar **[GitHub Issues](https://github.com/ronaldmego/claude-code-usage-dashboard/issues)** del repo para encontrar trabajo pendiente
@@ -21,43 +9,21 @@
 
 ---
 
-## Vision y Filosofia
+## Port
 
-**Monitoreo de gasolina real de Claude** — Los tokens de Claude son combustible finito que se resetea semanalmente. Este dashboard mide el consumo real para que alcance todos los dias.
+| Puerto | Bind | URL VPN | Proceso |
+|--------|------|---------|---------|
+| 3400 | `127.0.0.1` | `http://100.64.216.28:3400` | PM2: `token-dashboard` |
 
-### Principio clave: Gasolina Real
+---
 
-No todos los tokens son iguales. ~96% del volumen son **cacheReadTokens** (lectura de cache), que son gratis o muy baratos y **no consumen cuota**. Lo que realmente quema gasolina son:
+## Project Context
 
-- `outputTokens` — Lo que Claude genera
-- `inputTokens` — Contexto nuevo que Claude procesa
-- `cacheCreationInputTokens` — Primera escritura a cache
+Dashboard de consumo de tokens Claude. Mide gasolina real (`outputTokens` + `inputTokens` + `cacheCreationInputTokens`) ignorando `cacheReadTokens` (~96% del volumen, gratis). Fuente de verdad: % oficial de Claude `/usage` via PTY, snapshots cada ~10 min.
 
-**Formula:** `realTokens = totalTokens - cacheReadTokens`
+**Stack:** Node.js + Express, Vanilla HTML/CSS/JS + Chart.js, PM2. Sin build step.
 
-Solo medimos gasolina real. Todo lo demas es ruido.
-
-### Preguntas que responde
-
-1. **Cuanto queda?** — % semanal real (alineado con Claude `/usage`)
-2. **A que ritmo voy?** — Pace semanal: on track / acelerado / critico
-3. **Cuando se agota?** — Proyeccion de dia de agotamiento
-4. **Cuanta gasolina queme hoy/esta semana?** — Tokens reales (sin cache reads)
-
-### Fuente de datos
-
-- **Claude /usage** — Fuente de verdad: porcentajes globales de la cuenta via PTY. Snapshots cada ~10 min en `data/usage-curve.json`
-
-### Metodologia detallada
-
-Ver `TECHNICAL-NOTES.md` para la explicacion completa del metodo de medicion, que ignoramos, y por que.
-
-| Aspecto | Valor |
-|---------|-------|
-| URL | `http://<DASHBOARD_HOST>:<DASHBOARD_PORT>` |
-| Acceso | Configurable (default: localhost) |
-| Puerto | Configurable via `DASHBOARD_PORT` (default: 3400) |
-| PM2 | `token-dashboard` |
+Ver `README.md` para arquitectura detallada, endpoints, estructura de archivos, y componentes criticos.
 
 ---
 
@@ -76,84 +42,6 @@ http://localhost:3400
 # Forzar refresh de datos
 curl http://localhost:3400/api/refresh
 ```
-
----
-
-## Arquitectura
-
-### Stack
-
-```
-Node.js + Express
-Frontend: Vanilla HTML/CSS/JS + Chart.js
-Datos: Claude /usage (PTY) — snapshots de % cada ~10 min
-Process Manager: PM2
-```
-
-**Sin build step** — El frontend es un solo `index.html` con todo inline.
-
-### Diagrama
-
-```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Claude Code    │────▶│ claude-usage │────▶│   server.js │
-│  (/usage PTY)   │     │   (parser)   │     │   (Express) │
-└─────────────────┘     └──────────────┘     └──────────────┘
-                                                     │
-                                                     ▼
-                                             ┌─────────────┐
-                                             │ index.html  │
-                                             │ (Dashboard) │
-                                             └─────────────┘
-```
-
-### Estructura de Archivos
-
-```
-token-dashboard/
-├── server.js           # Express server + PTY integration
-├── claude-usage.js     # PTY wrapper para Claude /usage
-├── public/
-│   └── index.html      # Dashboard (todo inline: HTML, CSS, JS)
-├── data/
-│   ├── weekly-history.json  # Snapshots de eficiencia semanal
-│   └── usage-curve.json     # Snapshots periodicos de % (cada ~10 min)
-├── CLAUDE.md           # Este archivo
-├── TECHNICAL-NOTES.md  # Metodologia: gasolina real, que medimos, que ignoramos
-├── LIMITATIONS.md      # Limitaciones conocidas (IMPORTANTE)
-└── package.json
-```
-
-### API Endpoints
-
-| Endpoint | Metodo | Descripcion |
-|----------|--------|-------------|
-| `/` | GET | Dashboard HTML |
-| `/api/refresh` | GET | Redirige a `/api/global-usage/refresh` |
-| `/api/global-usage` | GET | **Uso global real** (Claude /usage via PTY) |
-| `/api/global-usage/refresh` | GET | Fuerza refresh de global usage |
-| `/api/usage-curve` | GET | Snapshots periodicos de % (para comparacion semanal) |
-| `/api/usage-deltas` | GET | Consumo derivado de deltas de % (rate, projection, daily, hourly, heatmap, curves) |
-| `/api/weekly-history` | GET | Historial de eficiencia semanal |
-| `/api/config` | GET | Configuracion (timezone) |
-
-**Global Usage:** Ejecuta Claude Code via PTY (~15-20s), cache 5 min. Retorna session%, weekAll%, weekSonnet%, extraUsage.
-
-**Usage Curve:** Cada fetch exitoso de global-usage guarda un snapshot en `data/usage-curve.json` (%, hora, dia del ciclo). Poda automatica: ultimos 28 dias.
-
-### Metricas del Dashboard
-
-**Tab Consumo (principal):** Derivado de deltas de % via snapshots de /usage. Ritmo actual (%/hora, ultimas 6h), proyeccion de agotamiento, consumo diario (delta % por dia, 14 dias), consumo por hora (48h), heatmap de intensidad del ciclo actual (cyan). Fuente: `/api/usage-deltas`.
-
-**Tab Overview:** Uso global (fuente de verdad: % sesion, semanal, sonnet), gauges de sesion y semanal (% restante). Fuente: `/api/global-usage`.
-
-**Tab Patrones:** Chart de lineas con % acumulado (0-100%) por hora del ciclo. Semana actual (verde) vs anterior (gris) vs ritmo ideal (purple). Fuente: `curves` en `/api/usage-deltas`.
-
-**Tab Eficiencia:** Eficiencia semanal actual (% usado vs disponible, colores relativos al progreso del ciclo), historial de semanas anteriores (3 columnas: semana, dia, % usado).
-
-### Ventanas de Tiempo (ver TECHNICAL-NOTES.md)
-
-El dashboard usa 3 ventanas de tiempo distintas. Cada metrica opera en una sola ventana y no deben mezclarse entre si.
 
 ---
 
@@ -179,6 +67,51 @@ pm2 status && pm2 restart token-dashboard && pm2 logs token-dashboard --err
 # Datos no actualizan
 curl http://localhost:3400/api/global-usage/refresh
 ```
+
+---
+
+## Boris Dev Principles
+
+> **Do I need a plan?**
+> Does this have more than 2 steps or architectural decisions? → Plan first. Write it in `tasks/todo.md`.
+> Did something go differently than expected? → Stop. Re-plan.
+> Am I assuming something I haven't verified?
+
+> **Am I using my resources well?**
+> Can I delegate this to a subagent to keep my context window clean?
+> Is there a skill in `~/.claude/skills/` that already does this? → Use it.
+> Am I doing this for the third time? → It should be a skill.
+
+> **Am I learning from my mistakes?**
+> If the user corrected me → did I update `tasks/lessons.md` with the pattern?
+> Did I review lessons at the start of this session?
+
+> **Is this actually done?**
+> Can I DEMONSTRATE it works? → Tests, logs, screenshots.
+> Did I test the happy path AND the error path?
+
+> **Is this the best solution or just the first one that worked?**
+> Would I write it this way if 1000 people would read the code?
+> Is the fix surgical or am I applying duct tape?
+
+> **Can I resolve this without hand-holding?**
+> If there's a bug → read logs, find root cause, fix it.
+> If CI fails → fix it without waiting for instructions.
+
+### Task Management
+
+1. **Plan First:** Write plan to `tasks/todo.md` with checkable items
+2. **Verify Plan:** Check in before starting implementation
+3. **Track Progress:** Mark items complete as you go
+4. **Explain Changes:** High-level summary at each step
+5. **Document Results:** Add review section to `tasks/todo.md`
+6. **Capture Lessons:** Update `tasks/lessons.md` after corrections
+
+### Core Principles
+
+> **Is there a simpler way to solve this?** If there is, why am I not using it?
+> **Am I solving the symptom or the cause?** If I had to bet money this won't come back, would I bet?
+> **How many files did I touch?** If more than necessary, what's extra?
 
 ---
 
@@ -225,12 +158,16 @@ curl http://localhost:3400/api/global-usage/refresh
 - **Sin autenticacion** — No incluye login. Si se expone en red, usar VPN o reverse proxy con auth
 - **Sin datos sensibles** — El dashboard solo muestra metricas de consumo, no credenciales ni tokens de API
 - **PTY isolation** — `claude-usage.js` ejecuta Claude Code en un PTY aislado, solo lee `/usage`
+- **Limitaciones:** Ver `LIMITATIONS.md`
 
-### Limitaciones de Datos
+---
 
-**LEER:** `LIMITATIONS.md`
+## Relevant Skills
 
-El dashboard depende del % oficial de Claude /usage via PTY. El PTY tarda ~15-20s y puede fallar intermitentemente. Los snapshots se guardan cada ~10 min y se filtran anomalias (drops >3%, weekPercent=0). La resolucion de datos es limitada por la frecuencia de snapshots.
+No hay skills especificas para este proyecto. Skills globales aplicables:
+
+- `vps-admin` — Troubleshooting de PM2, servicios, Docker
+- `security-ops` — Health checks, monitoreo
 
 ---
 
@@ -238,45 +175,7 @@ El dashboard depende del % oficial de Claude /usage via PTY. El PTY tarda ~15-20
 
 | Necesidad | Recurso |
 |-----------|---------|
+| Arquitectura y endpoints | `README.md` — File structure, API, dashboard tabs, critical components |
 | Metodologia de medicion | `TECHNICAL-NOTES.md` — Que medimos, que ignoramos, por que |
 | Limitaciones | `LIMITATIONS.md` |
 | Chart.js | https://www.chartjs.org/docs/ |
-
----
-
-*Documento atemporal — Solo info constante*
-
----
-
-## ⚠️ CRITICAL: claude-usage.js — Do Not Touch Without Testing
-
-`claude-usage.js` is the **single most critical file** in this project. It is the data extraction layer — without it, the entire dashboard shows 0% on everything. The UI is just presentation; this file is the engine.
-
-### How it works (as of 2026-03-01)
-
-```
-node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s for autocomplete → presses Enter → parses structured output → returns JSON with session%, weekAll%, weekSonnet%
-```
-
-### What can break it
-
-| Risk | Detail |
-|------|--------|
-| Claude CLI updates | Autocomplete timing, output format, or slash command behavior may change |
-| Env var `CLAUDECODE` | Must be filtered out or Claude refuses to start (nested session detection) |
-| PTY timing | 4s init + 1.5s autocomplete wait are empirical — too fast = autocomplete captures input, too slow = timeout |
-| Timeout (35s) | PTY takes ~20-25s to complete. If Claude is slow (high load), may timeout |
-| node-pty version | node-pty must match Node.js version. After Node upgrade, run `npm rebuild node-pty` |
-
-### Rules
-
-1. **Never change this file without running `node claude-usage.js --debug` first**
-2. **Check `/tmp/claude-usage-debug.log` for raw PTY output** if something looks wrong
-3. **If Claude CLI changes its `/usage` output format**, only `parseUsageOutput()` needs updating — the PTY spawn logic should remain stable
-4. **Test from PM2 context too** — env vars differ between interactive shell and PM2
-
-### History
-
-- **Pre-2026-03-01:** Used `execSync('claude usage')` which was never a valid CLI command. Worked by accident (parser extracted % from chatbot responses) until it stopped working.
-- **2026-03-01:** Rewritten to use node-pty with interactive `/usage` slash command. Fix confirmed: session 12%, weekAll 41%, weekSonnet 3%.
-

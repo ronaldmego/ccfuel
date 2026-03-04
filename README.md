@@ -44,7 +44,7 @@ See `TECHNICAL-NOTES.md` for the full methodology.
 ```
 Node.js + Express
 Frontend: Vanilla HTML/CSS/JS + Chart.js (single index.html, no build step)
-Data: ccusage (parses JSONL logs) + Claude /usage (via PTY)
+Data: Claude /usage (via PTY) — periodic % snapshots
 Process Manager: PM2 (optional)
 ```
 
@@ -103,13 +103,11 @@ cp .env.example .env
 ### Single machine (default)
 
 ```
-~/.claude/*.jsonl  ──>  ccusage (parser)  ──>  server.js  ──>  Dashboard
-                                                   ^
-Claude Code (/usage PTY)  ──>  claude-usage.js  ───┘
+Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──>  Dashboard
 ```
 
-- **ccusage** parses your local JSONL logs every 5 min for token breakdowns
 - **claude-usage.js** runs Claude Code's `/usage` command via PTY to get account-level percentages
+- Snapshots saved to `data/usage-curve.json` every ~10 min
 
 ### Multi-machine (optional)
 
@@ -120,6 +118,82 @@ Remote machine  ──>  push-usage.sh  ──POST /api/external-usage──>  D
 ```
 
 See [Multi-Machine Sync](#multi-machine-sync) below.
+
+### File Structure
+
+```
+claude-code-usage-dashboard/
+├── server.js           # Express server + PTY integration
+├── claude-usage.js     # PTY wrapper for Claude /usage
+├── public/
+│   └── index.html      # Dashboard (all inline: HTML, CSS, JS)
+├── data/
+│   ├── weekly-history.json  # Weekly efficiency snapshots
+│   └── usage-curve.json     # Periodic % snapshots (~every 10 min)
+├── CLAUDE.md           # Agent operating guide
+├── TECHNICAL-NOTES.md  # Measurement methodology
+├── LIMITATIONS.md      # Known limitations
+└── package.json
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Dashboard HTML |
+| `/api/refresh` | GET | Redirects to `/api/global-usage/refresh` |
+| `/api/global-usage` | GET | Real global usage (Claude /usage via PTY) |
+| `/api/global-usage/refresh` | GET | Force refresh global usage |
+| `/api/usage-curve` | GET | Periodic % snapshots (for weekly comparison) |
+| `/api/usage-deltas` | GET | Derived consumption from % deltas (rate, projection, daily, hourly, heatmap, curves) |
+| `/api/weekly-history` | GET | Weekly efficiency history |
+| `/api/config` | GET | Configuration (timezone) |
+
+**Global Usage:** Executes Claude Code via PTY (~15-20s), cached 5 min. Returns session%, weekAll%, weekSonnet%, extraUsage.
+
+**Usage Curve:** Each successful global-usage fetch saves a snapshot to `data/usage-curve.json` (%, hour, cycle day). Auto-pruned to last 28 days.
+
+### Dashboard Tabs
+
+- **Consumption (main):** Derived from % deltas via /usage snapshots. Current rate (%/hour, last 6h), depletion projection, daily consumption (14 days), hourly consumption (48h), current cycle intensity heatmap. Source: `/api/usage-deltas`.
+- **Overview:** Global usage (source of truth: session %, weekly, sonnet), session and weekly gauges (% remaining). Source: `/api/global-usage`.
+- **Patterns:** Line chart with cumulative % (0-100%) per cycle hour. Current week (green) vs previous (gray) vs ideal pace (purple). Source: `curves` in `/api/usage-deltas`.
+- **Efficiency:** Current weekly efficiency (% used vs available, colors relative to cycle progress), previous weeks history. Source: `/api/weekly-history`.
+
+## Critical Components
+
+### claude-usage.js — The Data Engine
+
+`claude-usage.js` is the **single most critical file** in this project. It is the data extraction layer — without it, the entire dashboard shows 0% on everything. The UI is just presentation; this file is the engine.
+
+#### How it works
+
+```
+node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s for autocomplete
+→ presses Enter → parses structured output → returns JSON with session%, weekAll%, weekSonnet%
+```
+
+#### What can break it
+
+| Risk | Detail |
+|------|--------|
+| Claude CLI updates | Autocomplete timing, output format, or slash command behavior may change |
+| `CLAUDE*` env vars | Must be filtered out or Claude refuses to start (nested session detection) |
+| PTY timing | 4s init + 1.5s autocomplete wait are empirical — too fast = autocomplete captures input, too slow = timeout |
+| Timeout (35s) | PTY takes ~20-25s to complete. If Claude is slow (high load), may timeout |
+| node-pty version | Must match Node.js version. After Node upgrade, run `npm rebuild node-pty` |
+
+#### Rules before modifying
+
+1. **Always run `node claude-usage.js --debug` first**
+2. **Check `/tmp/claude-usage-debug.log`** for raw PTY output if something looks wrong
+3. **If `/usage` output format changes**, only `parseUsageOutput()` needs updating — PTY spawn logic should remain stable
+4. **Test from PM2 context too** — env vars differ between interactive shell and PM2
+
+#### History
+
+- **Pre-2026-03-01:** Used `execSync('claude usage')` which was never a valid CLI command. Worked by accident until it stopped.
+- **2026-03-01:** Rewritten to use node-pty with interactive `/usage` slash command.
 
 ## Multi-Machine Sync
 
@@ -133,7 +207,7 @@ See `LOCALSETUP.md` for detailed setup instructions (hooks, scheduled tasks, tro
 
 | File | Contents |
 |------|----------|
-| `CLAUDE.md` | Guide for Claude Code (philosophy, architecture, commands) |
+| `CLAUDE.md` | Agent operating guide (commands, conventions, constraints) |
 | `TECHNICAL-NOTES.md` | Measurement methodology: real fuel vs cache reads |
 | `LOCALSETUP.md` | Multi-machine sync setup (optional) |
 | `LIMITATIONS.md` | Known data source limitations |
