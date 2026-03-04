@@ -11,10 +11,10 @@ function getClaudeUsage(debug = false) {
     let settled = false;
     const TOTAL_TIMEOUT = 35000;
 
-    // Filter out CLAUDECODE env var to avoid nested session detection
+    // Filter out all Claude Code session markers to avoid nested session detection
     const cleanEnv = Object.fromEntries(
       Object.entries(process.env).filter(([k]) =>
-        k !== 'CLAUDECODE'
+        !k.startsWith('CLAUDE')
       )
     );
 
