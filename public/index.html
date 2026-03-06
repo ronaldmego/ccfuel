@@ -1347,7 +1347,8 @@
             extraContainer.style.display = 'none';
           }
 
-          const cacheNote = data.cached ? ` (cache ${data.cacheAge}m)` : ' (fresh)';
+          const cacheMinutes = data.cacheAge != null ? Math.round(data.cacheAge / 60) : null;
+          const cacheNote = data.cached ? ` (cache ${cacheMinutes != null ? cacheMinutes + 'm' : '✓'})` : ' (fresh)';
           statusEl.textContent = 'Actualizado: ' + new Date(data.timestamp).toLocaleTimeString('es-PA') + cacheNote;
 
           if (data.weekAll.resetsAt != null) {
