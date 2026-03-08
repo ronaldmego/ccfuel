@@ -109,16 +109,6 @@ Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──> 
 - **claude-usage.js** runs Claude Code's `/usage` command via PTY to get account-level percentages
 - Snapshots saved to `data/usage-curve.json` every ~10 min
 
-### Multi-machine (optional)
-
-If you use Claude Code on multiple machines, remote instances can push their data to a central dashboard:
-
-```
-Remote machine  ──>  push-usage.sh  ──POST /api/external-usage──>  Dashboard (merged)
-```
-
-See [Multi-Machine Sync](#multi-machine-sync) below.
-
 ### File Structure
 
 ```
@@ -195,22 +185,13 @@ node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s
 - **Pre-2026-03-01:** Used `execSync('claude usage')` which was never a valid CLI command. Worked by accident until it stopped.
 - **2026-03-01:** Rewritten to use node-pty with interactive `/usage` slash command.
 
-## Multi-Machine Sync
-
-> **Optional.** Only needed if you run Claude Code on more than one machine.
-
-If you have multiple machines (e.g., a laptop and a server), you can sync usage data from remote machines to a central dashboard instance. The script `push-usage.sh` runs ccusage locally on the remote machine and POSTs the data.
-
-See `LOCALSETUP.md` for detailed setup instructions (hooks, scheduled tasks, troubleshooting).
-
 ## Documentation
 
 | File | Contents |
 |------|----------|
 | `CLAUDE.md` | Agent operating guide (commands, conventions, constraints) |
 | `TECHNICAL-NOTES.md` | Measurement methodology: real fuel vs cache reads |
-| `LOCALSETUP.md` | Multi-machine sync setup (optional) |
-| `LIMITATIONS.md` | Known data source limitations |
+| `LIMITATIONS.md` | Known limitations (PTY dependency, timezone) |
 | `CHANGELOG.md` | Version history |
 
 ## Design Philosophy
@@ -218,7 +199,7 @@ See `LOCALSETUP.md` for detailed setup instructions (hooks, scheduled tasks, tro
 - **Zero build step** — No React, no webpack. Vanilla JS + Chart.js.
 - **Single dependency** — Express. That's it.
 - **Real metrics only** — Cache reads are noise. We filter them out.
-- **Works anywhere** — Single machine by default, multi-machine if you need it.
+- **Works anywhere** — Any machine with Claude Code installed and authenticated.
 
 ## Note
 

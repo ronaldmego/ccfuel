@@ -6,111 +6,46 @@ Este documento explica como el dashboard mide el consumo de tokens y por que ign
 
 ## El Problema
 
-ccusage reporta `totalTokens` por dia y por bloque. Pero ~96% de esos tokens son **cacheReadTokens** (o `cacheReadInputTokens` en bloques), que son lecturas de cache que no consumen cuota real.
+Claude Code tiene un limite semanal de tokens. Pero ~96% de los tokens reportados son **cacheReadTokens** — lecturas de cache que no consumen cuota real.
 
-Si muestras `totalTokens` directamente:
+Si miras `totalTokens` directamente:
 - Los numeros se ven enormes (millones por dia)
 - No reflejan el gasto real de cuota
 - No sirven para saber si la gasolina te alcanza la semana
 
-## La Solucion: Gasolina Real
+## La Solucion: % Oficial via PTY
 
-### Que SI consume cuota (gasolina real)
+El dashboard obtiene el **porcentaje oficial** directamente de Claude Code via el comando `/usage` ejecutado en un PTY interactivo (`claude-usage.js`). Este % es la **unica fuente de verdad**.
 
-| Campo ccusage | Que es | Impacto en cuota |
-|---------------|--------|------------------|
-| `outputTokens` | Lo que Claude genera como respuesta | Alto — es la operacion mas cara |
-| `inputTokens` | Contexto nuevo que Claude tiene que procesar | Medio — cada mensaje nuevo |
-| `cacheCreationInputTokens` | Primera vez que algo entra al cache | Medio — se paga una vez |
+### Que mide Claude `/usage`
 
-### Que NO consume cuota (ruido)
+| Metrica | Que es |
+|---------|--------|
+| `session.percent` | % de la sesion actual (5 horas) |
+| `weekAll.percent` | % de la cuota semanal usada (todas las fuentes: CLI, web, API) |
+| `weekSonnet.percent` | % semanal solo modelos Sonnet |
 
-| Campo ccusage | Que es | Impacto en cuota |
-|---------------|--------|------------------|
-| `cacheReadInputTokens` | Re-leer algo que ya esta en cache | Ninguno — gratis o ~10% del costo |
+### Que tokens consumen cuota
 
-### Proporcion real observada
+| Tipo | Impacto en cuota |
+|------|------------------|
+| `outputTokens` | Alto — lo que Claude genera |
+| `inputTokens` | Medio — contexto nuevo |
+| `cacheCreationInputTokens` | Medio — primera escritura a cache |
+| `cacheReadInputTokens` | Ninguno — ~96% del volumen, gratis |
 
-En datos tipicos de uso:
-- cacheReadTokens: **~96%** del totalTokens
-- Tokens reales (output + input + cacheCreation): **~4%** del totalTokens
+### Metricas derivadas
 
-Mostrar `totalTokens` infla las cifras 25x vs la gasolina real.
-
----
-
-## Formulas
-
-### En datos diarios (daily)
-
-ccusage daily reporta por dia: `totalTokens`, `cacheReadTokens`, `cacheCreationTokens`, `totalCost`.
+El dashboard calcula consumo a partir de **deltas entre snapshots de %**:
 
 ```
-realTokensDaily = totalTokens - cacheReadTokens
+rate = delta_percent / delta_hours    → %/hora actual
+projection = rate * hours_remaining   → dia estimado de agotamiento
+daily = sum(deltas) por dia           → consumo diario en %
+hourly = sum(deltas) por hora         → consumo por franja horaria
 ```
 
-### En datos de bloques (blocks)
-
-ccusage blocks reporta por bloque: `totalTokens`, `costUSD`, y un objeto `tokenCounts` con los detalles.
-
-```
-realTokensBlock = totalTokens - tokenCounts.cacheReadInputTokens
-```
-
-> **Nota:** Los nombres y estructura difieren entre daily y blocks:
-> - Daily: `cacheReadTokens` a nivel raiz del objeto
-> - Blocks: `tokenCounts.cacheReadInputTokens` (anidado dentro de `tokenCounts`)
-
----
-
-## Alineacion con Claude /usage
-
-Claude tiene su propio sistema de medicion de cuota, accesible via el comando `/usage`. Retorna:
-
-- `session.percent` — % de la sesion actual (5 horas)
-- `weekAll.percent` — % de la cuota semanal usada (todas las fuentes)
-- `weekSonnet.percent` — % semanal solo modelos Sonnet
-
-El dashboard usa `weekAll.percent` como **fuente de verdad**. Los tokens reales calculados con ccusage son una aproximacion complementaria, pero el % de Claude es lo oficial.
-
-### Estimacion de cuota total
-
-```
-estimatedAllocation = combinedRealTokens / (weekPercent / 100)
-```
-
-Esto es una aproximacion. Si Claude dice 40% usado y nosotros medimos 10M tokens reales, entonces el total estimado es ~25M tokens. Pero es impreciso porque:
-- Claude puede medir de forma diferente (pesos distintos por modelo)
-- Hay fuentes que ccusage no captura (Claude.ai web, API directa)
-
----
-
-## Fuentes de Datos y Merge
-
-### Local (maquina principal)
-
-ccusage parsea `~/.claude/*.jsonl` directamente en la maquina donde corre el dashboard. Datos frescos cada 5 min.
-
-### Remoto (maquinas adicionales, opcional)
-
-`push-usage.sh` ejecuta ccusage en la maquina remota y envia JSON via POST:
-
-```
-POST /api/external-usage
-{
-  "source": "laptop",
-  "blocks": { "blocks": [...] },
-  "daily": { "daily": [...] }
-}
-```
-
-Guardado en `data/external/<source>.json`. El frontend hace merge sumando local + remotos.
-
-### Merge en charts
-
-- **Chart diario**: Para cada fecha, suma `realTokens` de local + `realTokens` de cada fuente remota
-- **Chart horario**: Agrega bloques por hora del dia (timezone Panama UTC-5), local + remotos stacked
-- **Stats cards**: Suma gasolina real de todas las fuentes
+Ver `computeUsageDeltas()` en `server.js`.
 
 ---
 
@@ -152,7 +87,7 @@ Si Claude dice "resets at 10am" y hoy es miercoles 11 feb a las 7pm:
 
 ## Timezone: Panama (UTC-5)
 
-**Todo** el dashboard opera en hora Panama (UTC-5). Esto es critico porque ccusage reporta fechas en la zona local donde corre, y las comparaciones de "hoy" y ciclo semanal deben coincidir.
+**Todo** el dashboard opera en hora Panama (UTC-5). Esto es critico porque las comparaciones de "hoy" y ciclo semanal deben ser consistentes.
 
 ### Patron centralizado
 
@@ -223,41 +158,6 @@ Un bloque registrado a las 1pm del dia de reset puede caer en la semana **anteri
 
 ---
 
-## Pace Semanal
-
-Compara tokens reales consumidos en la semana actual vs la semana anterior, al mismo punto del ciclo.
-
-### Calculo
-
-```
-currentCurve = computeWeeklyCurve(allBlocks, cycleStart, nextReset)  // 168 buckets
-prevCurve = computeWeeklyCurve(allBlocks, cycleStart - 7d, cycleStart)
-
-elapsedHours = floor(elapsedDays * 24)
-currentTokensAtNow = currentCurve[elapsedHours - 1]
-prevTokensAtNow = prevCurve[elapsedHours - 1]
-tokenDiffPct = (current - prev) / prev * 100
-```
-
-### Clasificacion
-
-| tokenDiffPct | Estado | Color |
-|-------------|--------|-------|
-| <= -20% | Por debajo | Verde |
-| -20% a +20% | Similar | Verde |
-| +20% a +50% | Por encima | Naranja |
-| > +50% | Muy por encima | Rojo |
-
-### Barra visual
-
-Escala = `max(current, prev) * 1.15` (15% headroom). Barra solida = semana actual. Marcador punteado = semana anterior al mismo punto.
-
-### Nota importante
-
-El pace usa tokens de ccusage (solo logs JSONL), **no** `weekAllPercent` de Claude `/usage`. Mezclar ambas fuentes produce discrepancias porque `/usage` incluye web y API que ccusage no ve.
-
----
-
 ## Eficiencia Semanal
 
 Los tokens de Claude no se acumulan — lo que no usas en la semana se pierde al reset. Por eso medimos eficiencia como:
@@ -289,10 +189,6 @@ Cada vez que se consulta `/api/global-usage` con datos frescos, se guarda un sna
 {
   "weekId": "2026-02-05",
   "weekPercent": 85,
-  "vpsTokens": 5702615,
-  "extTokens": 3030476,
-  "combinedTokens": 8733091,
-  "estimatedAllocation": 10274225,
   "dayNum": 7
 }
 ```
@@ -301,39 +197,23 @@ El `weekId` es la fecha de inicio del ciclo (no el dia de la semana tradicional)
 
 ---
 
-## Tab Patrones: Heatmap y Comparacion Semanal
+## Tab Patrones: Curvas de % y Heatmap
 
-### Heatmap de Actividad (CSS Grid)
+### Heatmap de Intensidad (CSS Grid)
 
-Renderizado como HTML/CSS grid (no Chart.js matrix — ese plugin no alineaba las celdas correctamente). Cada celda representa 1 hora de 1 dia del ciclo semanal.
+Renderizado como HTML/CSS grid (no Chart.js matrix). Cada celda representa 1 hora de 1 dia del ciclo semanal. Derivado de deltas de % entre snapshots.
 
-**Funcion:** `buildHeatmapMatrix(allBlocks, cycleStartISO)` → matriz 7x24
-
-**Logica por bloque:**
-1. Convertir `block.startTime` a hora Panama via `getPanamaDate()`
-2. Calcular dia del ciclo: `floor((blockPanama - cycleStartPanama) / 1 dia)` → 0-6
-3. Extraer hora: `blockPanama.getUTCHours()` → 0-23
-4. Sumar `blockRealTokens(block)` a `matrix[day][hour]`
-
-**Colores:** Verde (#4ade80) con alpha proporcional a `val / maxVal`. Celdas sin actividad: gris minimo. Dias futuros: casi invisible.
-
-**Combina:** Local + remoto (todos los bloques mezclados antes de construir la matriz).
+**Colores:** Cyan (#22d3ee) con alpha proporcional al consumo relativo. Celdas sin actividad: gris minimo. Dias futuros: casi invisible.
 
 ### Comparacion Semana Actual vs Anterior
 
-Chart.js line chart con tokens **acumulados** por hora del ciclo.
+Chart.js line chart con **% acumulado** (0-100%) por hora del ciclo.
 
-**Funcion:** `computeWeeklyCurve(allBlocks, weekStartISO, weekEndISO)` → array de 168 valores
+- Curva verde: semana actual
+- Curva gris punteada: semana anterior
+- Curva morada: pace ideal (lineal)
 
-**Logica:**
-1. Crear 168 buckets (7 dias x 24h), cada uno = tokens de esa hora
-2. Filtrar bloques en el rango [weekStartISO, weekEndISO)
-3. Asignar cada bloque al bucket correspondiente segun hora transcurrida desde weekStart
-4. Convertir a acumulado (cada bucket = suma de todos los anteriores + propio)
-
-**Semana anterior:** Se calcula `prevStart = cycleStart - 7 dias`. Si no hay datos previos, solo muestra curva actual con mensaje "Primera semana registrada".
-
-**Summary:** Muestra comparacion textual al punto actual: "A las Xh: Y esta semana vs Z anterior (+/-N%)"
+Datos de `curves` en `/api/usage-deltas`, derivados de snapshots en `data/usage-curve.json`.
 
 ### Snapshots de Curva de Uso
 
@@ -359,17 +239,18 @@ Archivo `data/usage-curve.json` con snapshots periodicos del % global.
 
 ---
 
-## Que NO Capturamos
+## Cobertura de Datos
 
-| Fuente | Visible | Razon |
-|--------|---------|-------|
-| Claude Code local | Si | Logs locales en ~/.claude/ |
-| Claude Code remoto | Si | Sync via push-usage.sh (opcional) |
-| Claude.ai web | No | No genera logs JSONL |
-| API calls directas | No | No pasan por Claude Code |
-| Cursor, Continue, etc. | No | Apps terceras no generan logs compatibles |
+El % de Claude `/usage` es **account-level** — incluye todo el consumo independientemente de la fuente:
 
-El % de Claude `/usage` SI incluye todo (web, API, etc), por eso es la fuente de verdad para el % semanal.
+| Fuente | Incluida en % | Razon |
+|--------|---------------|-------|
+| Claude Code (CLI) | Si | Cuenta contra la cuota semanal |
+| Claude.ai web | Si | Misma cuenta, misma cuota |
+| API calls directas | Si | Misma cuenta |
+| Cursor, Continue, etc. | Si | Si usan la misma cuenta |
+
+Esta es la ventaja principal del enfoque PTY: el % oficial ya incluye todo, sin necesidad de parsear logs individuales.
 
 ---
 

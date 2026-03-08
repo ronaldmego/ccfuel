@@ -1288,7 +1288,7 @@
         document.getElementById('session-gauge-info').textContent =
           `Reset ${countdown.timeLabel} (${countdown.h}h ${countdown.m}m) | ${percent}% usado`;
       } else {
-        document.getElementById('session-gauge-info').textContent = percent + '% usado';
+        document.getElementById('session-gauge-info').textContent = percent + '% usado | Reset time unavailable';
       }
     }
 
@@ -1326,7 +1326,7 @@
               const label = cd.isMultiDay ? cd.dateLabel : cd.timeLabel;
               el.textContent = `Reset: ${label} (${cd.h}h ${cd.m}m)`;
             } else {
-              el.textContent = '';
+              el.textContent = 'Reset time unavailable';
             }
           }
 
