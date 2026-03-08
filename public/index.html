@@ -870,79 +870,10 @@
         <span class="tab-icon">📈</span>
         <span>Overview</span>
       </button>
-      <button class="tab" data-tab="consumo">
-        <span class="tab-icon">⛽</span>
-        <span>Consumo</span>
-      </button>
       <button class="tab" data-tab="semana">
         <span class="tab-icon">🎯</span>
         <span>Semana</span>
       </button>
-    </div>
-
-    <!-- Tab: Consumo (deltas de %) -->
-    <div class="tab-content" id="tab-consumo">
-      <!-- Rate + Projection Cards -->
-      <div class="consumo-cards">
-        <div class="consumo-card" style="--accent-color: #22d3ee;">
-          <div class="consumo-card-label">Ritmo Actual (ultimas 6h)</div>
-          <div class="consumo-card-value cyan" id="consumo-rate">--</div>
-          <div class="consumo-card-sub" id="consumo-rate-sub">%/hora</div>
-        </div>
-        <div class="consumo-card" style="--accent-color: #a78bfa;">
-          <div class="consumo-card-label">Proyeccion de Agotamiento</div>
-          <div class="consumo-card-value purple" id="consumo-projection">--</div>
-          <div class="consumo-card-sub" id="consumo-projection-sub">estimado</div>
-        </div>
-      </div>
-
-      <!-- Delta Daily Chart -->
-      <div class="charts-grid">
-        <div class="chart-card">
-          <div class="chart-header">
-            <span class="chart-title">⛽ Consumo Diario (delta %)</span>
-            <div style="display:flex; gap:12px; font-size:0.75em; color:#71717a;">
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#22d3ee;display:inline-block;"></span> ≤10%</span>
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#fbbf24;display:inline-block;"></span> >10%</span>
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#f87171;display:inline-block;"></span> >15%</span>
-            </div>
-          </div>
-          <div class="chart-wrapper">
-            <canvas id="deltaDailyChart"></canvas>
-          </div>
-          <div style="font-size:0.7em; color:#52525b; margin-top:6px;">Cambio porcentual por dia, derivado de snapshots de /usage cada ~10 min.</div>
-        </div>
-
-        <!-- Delta Hourly Chart -->
-        <div class="chart-card">
-          <div class="chart-header">
-            <span class="chart-title">🕐 Consumo por Hora (48h)</span>
-          </div>
-          <div class="chart-wrapper">
-            <canvas id="deltaHourlyChart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Delta Heatmap -->
-      <div class="pattern-card">
-        <div class="pattern-card-header">
-          <span class="pattern-card-title">🔥 Patron de Uso</span>
-          <span style="font-size:0.75em; color:#52525b;" id="heatmap-weeks-info"></span>
-        </div>
-        <div class="pattern-card-subtitle">Intensidad promedio por dia de semana y hora — cyan = mas consumo</div>
-        <div id="delta-heatmap-container">
-          <div id="delta-heatmap-grid" class="delta-heatmap-grid"></div>
-          <div class="heatmap-legend">
-            <span>Menos</span>
-            <div class="delta-heatmap-legend-gradient"></div>
-            <span>Mas</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Meta info -->
-      <div class="consumo-meta" id="consumo-meta">Cargando datos de consumo...</div>
     </div>
 
     <!-- Tab: Overview -->
@@ -1026,9 +957,10 @@
       <!-- Week Comparison (% acumulado) -->
       <div class="pattern-card">
         <div class="pattern-card-header">
-          <span class="pattern-card-title">📊 Consumo: Esta Semana vs Anterior</span>
+          <span class="pattern-card-title">📊 Consumo: Esta Semana vs...</span>
         </div>
         <div class="pattern-card-subtitle">% acumulado por hora del ciclo (fuente: Claude /usage)</div>
+        <div id="comparison-week-selector" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
         <div id="comparison-container">
           <div class="comparison-wrapper">
             <canvas id="comparisonChart"></canvas>
@@ -1036,6 +968,64 @@
           <div class="comparison-summary" id="comparison-summary"></div>
         </div>
       </div>
+
+      <!-- Consumo Section (previously separate tab) -->
+      <div class="consumo-cards">
+        <div class="consumo-card" style="--accent-color: #22d3ee;">
+          <div class="consumo-card-label">Ritmo Actual (ultimas 6h)</div>
+          <div class="consumo-card-value cyan" id="consumo-rate">--</div>
+          <div class="consumo-card-sub" id="consumo-rate-sub">%/hora</div>
+        </div>
+        <div class="consumo-card" style="--accent-color: #a78bfa;">
+          <div class="consumo-card-label">Proyeccion de Agotamiento</div>
+          <div class="consumo-card-value purple" id="consumo-projection">--</div>
+          <div class="consumo-card-sub" id="consumo-projection-sub">estimado</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">⛽ Consumo Diario (delta %)</span>
+            <div style="display:flex; gap:12px; font-size:0.75em; color:#71717a;">
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#22d3ee;display:inline-block;"></span> ≤10%</span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#fbbf24;display:inline-block;"></span> >10%</span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#f87171;display:inline-block;"></span> >15%</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="deltaDailyChart"></canvas>
+          </div>
+          <div style="font-size:0.7em; color:#52525b; margin-top:6px;">Cambio porcentual por dia, derivado de snapshots de /usage cada ~10 min.</div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">🕐 Consumo por Hora (48h)</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="deltaHourlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-card-header">
+          <span class="pattern-card-title">🔥 Patron de Uso</span>
+          <span style="font-size:0.75em; color:#52525b;" id="heatmap-weeks-info"></span>
+        </div>
+        <div class="pattern-card-subtitle">Intensidad promedio por dia de semana y hora — cyan = mas consumo</div>
+        <div id="delta-heatmap-container">
+          <div id="delta-heatmap-grid" class="delta-heatmap-grid"></div>
+          <div class="heatmap-legend">
+            <span>Menos</span>
+            <div class="delta-heatmap-legend-gradient"></div>
+            <span>Mas</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="consumo-meta" id="consumo-meta">Cargando datos de consumo...</div>
     </div>
 
     <!-- Tab: Semana -->
@@ -1071,7 +1061,7 @@
           <span class="eff-title">📈 Curvas Semanales</span>
         </div>
         <div style="font-size:0.75em; color:#52525b; margin-bottom:8px;">% acumulado por dia del ciclo — una linea por semana</div>
-        <div style="position:relative; height:260px;">
+        <div style="position:relative; height:420px;">
           <canvas id="weeklyCurvesChart"></canvas>
         </div>
       </div>
@@ -1119,17 +1109,9 @@
         tab.classList.add('active');
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
         // Re-render charts when tab becomes visible (Chart.js needs visible container)
-        if (tab.dataset.tab === 'overview') loadComparisonChart();
-        if (tab.dataset.tab === 'consumo') {
-          if (window._consumoData) {
-            const d = window._consumoData;
-            renderDeltaDailyChart(d.daily);
-            renderDeltaHourlyChart(d.hourly);
-            renderDeltaHeatmap(d.heatmap, d.heatmapWeeks);
-            window._consumoData = null;
-          } else {
-            loadConsumoTab();
-          }
+        if (tab.dataset.tab === 'overview') {
+          loadComparisonChart();
+          loadConsumoTab();
         }
         if (tab.dataset.tab === 'semana') loadWeeklyCurvesChart();
       });
@@ -1541,8 +1523,17 @@
       // Ideal pace line
       const idealData = Array.from({length: 168}, (_, i) => Math.round((i / 167) * 100 * 100) / 100);
 
-      // Historical week colors (grays/dimmed)
-      const histColors = ['#3f3f46', '#52525b', '#6b7280', '#78716c'];
+      // Distinct colors for historical weeks (most recent = brightest)
+      const histColors = [
+        '#f97316', // orange
+        '#22d3ee', // cyan
+        '#f472b6', // pink
+        '#facc15', // yellow
+        '#a78bfa', // purple
+        '#34d399', // emerald
+        '#fb923c', // light orange
+        '#38bdf8', // sky blue
+      ];
 
       const datasets = [];
 
@@ -1552,11 +1543,12 @@
         const data = buildDailyArray(curves[wid]);
         const startDate = new Date(wid + 'T00:00:00Z');
         const label = (startDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + startDate.getUTCDate().toString().padStart(2,'0');
+        // Assign colors from most recent (end) to oldest
+        const colorIdx = historicalIds.length - 1 - idx;
         datasets.push({
           label: label,
           data,
-          borderColor: histColors[idx % histColors.length],
-          borderDash: [6, 3],
+          borderColor: histColors[colorIdx % histColors.length],
           borderWidth: 1.5,
           fill: false,
           tension: 0.3,
@@ -1633,7 +1625,12 @@
                   return idx % 24 === 0 ? 'D' + (Math.floor(idx / 24) + 1) : '';
                 }
               },
-              grid: { display: false }
+              grid: {
+                color: function(ctx) {
+                  return ctx.tick && ctx.index % 24 === 0 ? 'rgba(255,255,255,0.08)' : 'transparent';
+                },
+                drawTicks: false
+              }
             },
             y: {
               min: 0,
@@ -1643,7 +1640,7 @@
                 font: { size: 11 },
                 callback: v => v + '%'
               },
-              grid: { color: 'rgba(255,255,255,0.05)' }
+              grid: { display: false }
             }
           }
         }
@@ -1666,8 +1663,41 @@
 
     // === Patterns Tab ===
     let comparisonChart = null;
+    let comparisonCurvesCache = null;
+    let comparisonCurrentWeekId = null;
+    let comparisonSelectedWeekId = null;
+
+    function buildComparisonWeekSelector(curves, currentWeekId) {
+      const container = document.getElementById('comparison-week-selector');
+      if (!container) return;
+      const weekIds = Object.keys(curves).sort().filter(id => id !== currentWeekId);
+      if (weekIds.length === 0) { container.innerHTML = ''; return; }
+
+      // Show last 4 weeks max
+      const recent = weekIds.slice(-4).reverse();
+      container.innerHTML = recent.map((wid, idx) => {
+        const d = new Date(wid + 'T00:00:00Z');
+        const label = idx === 0 ? 'Anterior' : `Hace ${idx + 1} sem`;
+        const dateLabel = (d.getUTCMonth()+1).toString().padStart(2,'0') + '-' + d.getUTCDate().toString().padStart(2,'0');
+        const selected = (comparisonSelectedWeekId || recent[0]) === wid;
+        return `<button class="comp-week-btn${selected ? ' active' : ''}" data-wid="${wid}" style="
+          padding:4px 10px; border-radius:6px; border:1px solid ${selected ? '#a78bfa' : 'rgba(255,255,255,0.1)'};
+          background:${selected ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.03)'};
+          color:${selected ? '#c4b5fd' : '#71717a'}; font-size:0.75em; cursor:pointer; font-family:inherit;
+        ">${label} (${dateLabel})</button>`;
+      }).join('');
+
+      container.querySelectorAll('.comp-week-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          comparisonSelectedWeekId = btn.dataset.wid;
+          renderComparison(comparisonCurvesCache, comparisonCurrentWeekId);
+        });
+      });
+    }
 
     function renderComparison(curves, currentWeekId) {
+      comparisonCurvesCache = curves;
+      comparisonCurrentWeekId = currentWeekId;
       const summaryEl = document.getElementById('comparison-summary');
 
       if (!curves || Object.keys(curves).length === 0) {
@@ -1677,8 +1707,17 @@
 
       const weekIds = Object.keys(curves).sort();
       const currentCurve = curves[currentWeekId] || curves[weekIds[weekIds.length - 1]];
-      const prevWeekId = weekIds.length >= 2 ? weekIds[weekIds.length - 2] : null;
-      const prevCurve = prevWeekId && prevWeekId !== currentWeekId ? curves[prevWeekId] : null;
+
+      // Build week selector buttons
+      buildComparisonWeekSelector(curves, currentWeekId);
+
+      // Use selected week or default to most recent previous
+      const historicalIds = weekIds.filter(id => id !== currentWeekId);
+      const prevWeekId = comparisonSelectedWeekId && historicalIds.includes(comparisonSelectedWeekId)
+        ? comparisonSelectedWeekId
+        : (historicalIds.length > 0 ? historicalIds[historicalIds.length - 1] : null);
+      if (!comparisonSelectedWeekId && prevWeekId) comparisonSelectedWeekId = prevWeekId;
+      const prevCurve = prevWeekId ? curves[prevWeekId] : null;
 
       // Build 168-point arrays (one per hour) with forward-fill
       function buildHourlyArray(points) {
@@ -1757,8 +1796,10 @@
       ];
 
       if (prevData) {
+        const prevDate = new Date(prevWeekId + 'T00:00:00Z');
+        const prevLabel = 'Sem ' + (prevDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + prevDate.getUTCDate().toString().padStart(2,'0');
         datasets.splice(1, 0, {
-          label: 'Semana pasada',
+          label: prevLabel,
           data: prevData,
           borderColor: '#52525b',
           borderDash: [6, 3],
@@ -1805,7 +1846,12 @@
                   return idx % 24 === 0 ? this.getLabelForValue(val) : '';
                 }
               },
-              grid: { display: false }
+              grid: {
+                color: function(ctx) {
+                  return ctx.tick && ctx.index % 24 === 0 ? 'rgba(255,255,255,0.08)' : 'transparent';
+                },
+                drawTicks: false
+              }
             },
             y: {
               min: 0,
@@ -1815,7 +1861,7 @@
                 font: { size: 11 },
                 callback: v => v + '%'
               },
-              grid: { color: 'rgba(255,255,255,0.05)' }
+              grid: { display: false }
             }
           }
         }
@@ -2101,7 +2147,7 @@
         updateRateCard(data.currentRate);
         updateProjectionCard(data.projection);
 
-        const tabVisible = document.getElementById('tab-consumo').classList.contains('active');
+        const tabVisible = document.getElementById('tab-overview').classList.contains('active');
         if (tabVisible) {
           renderDeltaDailyChart(data.daily);
           renderDeltaHourlyChart(data.hourly);

@@ -168,6 +168,12 @@ function parseUsageOutput(output) {
       }
     }
 
+    // Discard resetsAt if it's already in the past (likely corrupted by ANSI cleaning)
+    if (resetsAt && new Date(resetsAt) <= new Date()) {
+      resetsAt = null;
+      resetsAtHour = null;
+    }
+
     return { percent, resetsAtHour, resetsAt };
   }
 

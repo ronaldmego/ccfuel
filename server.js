@@ -30,7 +30,9 @@ try {
 
 function updatePersistedResets(usage) {
   let changed = false;
-  for (const key of ['session', 'weekAll', 'weekSonnet']) {
+  // Only persist weekAll and weekSonnet resets — session reset parsing is unreliable
+  // because ANSI cursor codes corrupt short times like "2am" (no month/day context to anchor)
+  for (const key of ['weekAll', 'weekSonnet']) {
     if (usage[key]?.resetsAt) {
       persistedResets[key] = usage[key].resetsAt;
       changed = true;
@@ -38,6 +40,11 @@ function updatePersistedResets(usage) {
       // PTY failed to parse, but persisted value is still in the future — inject it
       if (usage[key]) usage[key].resetsAt = persistedResets[key];
     }
+  }
+  // Clear session from persisted cache — it's unreliable
+  if (persistedResets.session) {
+    delete persistedResets.session;
+    changed = true;
   }
   if (changed) {
     try { fs.writeFileSync(RESETS_CACHE_FILE, JSON.stringify(persistedResets, null, 2)); } catch (e) { /* ignore */ }
