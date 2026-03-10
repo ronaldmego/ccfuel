@@ -1646,7 +1646,10 @@
               },
               grid: {
                 color: function(ctx) {
-                  return ctx.tick && ctx.index % 24 === 0 ? 'rgba(255,255,255,0.08)' : 'transparent';
+                  return ctx.index % 24 === 0 ? 'rgba(255,255,255,0.1)' : 'transparent';
+                },
+                lineWidth: function(ctx) {
+                  return ctx.index % 24 === 0 ? 1 : 0;
                 },
                 drawTicks: false
               }
@@ -1867,7 +1870,10 @@
               },
               grid: {
                 color: function(ctx) {
-                  return ctx.tick && ctx.index % 24 === 0 ? 'rgba(255,255,255,0.08)' : 'transparent';
+                  return ctx.index % 24 === 0 ? 'rgba(255,255,255,0.1)' : 'transparent';
+                },
+                lineWidth: function(ctx) {
+                  return ctx.index % 24 === 0 ? 1 : 0;
                 },
                 drawTicks: false
               }
