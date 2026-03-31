@@ -13,7 +13,7 @@
 
 | Puerto | Bind | URL VPN | Proceso |
 |--------|------|---------|---------|
-| 3400 | `127.0.0.1` | `http://100.64.216.28:3400` | PM2: `token-dashboard` |
+| 3400 | `100.64.216.28` | `http://100.64.216.28:3400` | PM2: `token-dashboard` |
 
 ---
 
@@ -72,46 +72,54 @@ curl http://localhost:3400/api/global-usage/refresh
 
 ## Boris Dev Principles
 
-> **Do I need a plan?**
-> Does this have more than 2 steps or architectural decisions? → Plan first. Write it in `tasks/todo.md`.
-> Did something go differently than expected? → Stop. Re-plan.
-> Am I assuming something I haven't verified?
+> **Mandatory.** Non-negotiable directives that every session must follow, plus self-check questions that develop judgment.
+
+### Non-Negotiable Directives
+
+**Planning:**
+- Plan before any multi-step task (3+ steps or architectural decisions). Write to `tasks/todo.md`.
+- If something goes wrong, STOP and re-plan. Don't keep pushing a failing approach.
+
+**Quality:**
+- Prove work is done — tests, logs, or screenshots. Never just say "it works."
+- Fix bugs autonomously — read logs, find root cause, fix it. Zero hand-holding.
+- After ANY user correction, update `tasks/lessons.md` immediately.
+- Review `tasks/lessons.md` at session start.
+
+**Traceability:**
+- Every feature, fix, or improvement starts as a GitHub Issue. No issue, no work.
+- Update `CHANGELOG.md` on every meaningful change. Reference the GitHub Issue (`#N`).
+- Every PR must include `Closes #N`.
+
+**Skills & Governance:**
+- Check `~/.claude/skills/` at session start. Use existing skills.
+- Invoke `supabase-local` before any Supabase DDL operation.
+- Port/project/schema changes → update the corresponding registry.
+
+### Self-Check Questions
+
+> **Is this the best solution or the first that worked?**
+> Surgical fix or duct tape? For simple changes, simplicity is also elegance.
 
 > **Am I using my resources well?**
-> Can I delegate this to a subagent to keep my context window clean?
-> Is there a skill in `~/.claude/skills/` that already does this? → Use it.
-> Am I doing this for the third time? → It should be a skill.
+> Can I delegate to a subagent? Am I solving too many things at once?
 
-> **Am I learning from my mistakes?**
-> If the user corrected me → did I update `tasks/lessons.md` with the pattern?
-> Did I review lessons at the start of this session?
+> **Is there a simpler way?** If yes, why am I not using it?
 
-> **Is this actually done?**
-> Can I DEMONSTRATE it works? → Tests, logs, screenshots.
-> Did I test the happy path AND the error path?
+> **Symptom or cause?** Would I bet money this won't come back?
 
-> **Is this the best solution or just the first one that worked?**
-> Would I write it this way if 1000 people would read the code?
-> Is the fix surgical or am I applying duct tape?
+> **How many files did I touch?** If more than necessary, what's extra?
 
-> **Can I resolve this without hand-holding?**
-> If there's a bug → read logs, find root cause, fix it.
-> If CI fails → fix it without waiting for instructions.
+> **Before merge:** Does it work, or does it just not break? Did I test as a user?
 
 ### Task Management
 
-1. **Plan First:** Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plan:** Check in before starting implementation
+1. **Plan First:** `tasks/todo.md` with checkable items
+2. **Verify Plan:** Check in before implementing
 3. **Track Progress:** Mark items complete as you go
 4. **Explain Changes:** High-level summary at each step
-5. **Document Results:** Add review section to `tasks/todo.md`
+5. **Document Results:** Review section in todo.md
 6. **Capture Lessons:** Update `tasks/lessons.md` after corrections
-
-### Core Principles
-
-> **Is there a simpler way to solve this?** If there is, why am I not using it?
-> **Am I solving the symptom or the cause?** If I had to bet money this won't come back, would I bet?
-> **How many files did I touch?** If more than necessary, what's extra?
 
 ---
 

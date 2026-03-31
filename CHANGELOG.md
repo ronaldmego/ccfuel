@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-03-31
+
+### Fix: Dashboard no cargaba via Tailscale
+
+**Problema:** `http://100.64.216.28:3400/` no respondía. El servidor estaba bindeado a `127.0.0.1` y rechazaba conexiones desde la IP de Tailscale.
+
+**Fix:**
+- Creado `ecosystem.config.cjs` con `DASHBOARD_HOST=100.64.216.28` para que PM2 pase la variable de entorno correctamente
+- Reiniciado PM2 con la nueva config — servidor ahora escucha en `100.64.216.28:3400`
+- `pm2 save` ejecutado para persistir la configuración
+
 ## 2026-03-01
 
 ### CRITICAL Fix: claude-usage.js rewritten from execSync to PTY (#18, #19)
