@@ -1380,6 +1380,11 @@
 
           updateEfficiencyCurrentWeek(data.weekAll.percent);
 
+          // Re-render weekly history now that weeklyResetsAt is set → lets the
+          // table resolve the real current weekId instead of falling back to
+          // "first array entry" (which goes stale when snapshots are missing).
+          loadWeeklyHistory();
+
           document.getElementById('last-update').textContent = new Date().toLocaleString('es-PA');
         } else {
           document.getElementById('global-usage-status').textContent = 'Error: ' + (data.error || 'Unknown');
@@ -1450,20 +1455,49 @@
           return;
         }
 
+        // Claude's week is a rolling 7-day cycle whose reset day can shift
+        // (earlier when limits hit, later when idle). So the actual end of a
+        // historical cycle is the *next* cycle's start, not a fixed start+7d.
+        // Also, the "actual" row must match the real current cycle — not just
+        // array index 0, which goes stale when snapshots are missing.
+        let currentWeekId = null;
+        if (weeklyResetsAt || weeklyResetHour != null) {
+          try {
+            currentWeekId = getWeekCycleInfo().cycleStart.toISOString().split('T')[0];
+          } catch (e) { /* fallback to index-based detection below */ }
+        }
+        const fmtMMDD = d => (d.getUTCMonth()+1).toString().padStart(2,'0') + '-' + d.getUTCDate().toString().padStart(2,'0');
+
         tbody.innerHTML = data.history.map((w, i) => {
           const pct = w.weekPercent;
           const barColor = pct > 80 ? '#4ade80' : pct > 50 ? '#fbbf24' : '#f87171';
           const barWidth = Math.min(pct, 100);
-          const isCurrent = i === 0;
+          const isCurrent = currentWeekId ? (w.weekId === currentWeekId) : (i === 0);
 
           const startDate = new Date(w.weekId + 'T00:00:00Z');
-          const endDate = new Date(startDate);
-          endDate.setUTCDate(endDate.getUTCDate() + 7);
-          const startStr = (startDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + startDate.getUTCDate().toString().padStart(2,'0');
-          const endStr = (endDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + endDate.getUTCDate().toString().padStart(2,'0');
-          const weekLabel = isCurrent
-            ? startStr + ' → hoy <span style="font-size:0.7em;color:#a78bfa">actual</span>'
-            : startStr + ' → ' + endStr;
+          const startStr = fmtMMDD(startDate);
+          const nextEntry = i > 0 ? data.history[i - 1] : null;
+
+          let endLabel, gapBadge = '';
+          if (isCurrent) {
+            endLabel = 'hoy <span style="font-size:0.7em;color:#a78bfa">actual</span>';
+          } else if (nextEntry) {
+            const nextStart = new Date(nextEntry.weekId + 'T00:00:00Z');
+            endLabel = fmtMMDD(nextStart);
+            // Nominal cycle = 7d, can extend to ~8-9d when unused. Anything
+            // larger means snapshots were lost (dashboard offline or PTY fail).
+            const spanDays = Math.round((nextStart - startDate) / 86400000);
+            if (spanDays > 9) {
+              const gapDays = spanDays - 7;
+              gapBadge = ` <span style="font-size:0.7em;color:#fbbf24" title="~${gapDays}d sin snapshots entre ciclos">⚠ hueco ${gapDays}d</span>`;
+            }
+          } else {
+            // Top row but not the current cycle → ciclo cerrado sin snapshot nuevo
+            const fallbackEnd = new Date(startDate);
+            fallbackEnd.setUTCDate(fallbackEnd.getUTCDate() + 7);
+            endLabel = fmtMMDD(fallbackEnd) + ' <span style="font-size:0.7em;color:#71717a">(ciclo cerrado)</span>';
+          }
+          const weekLabel = startStr + ' → ' + endLabel + gapBadge;
 
           // Velocity column — show exact time to 100% and offline time
           let velocityText;

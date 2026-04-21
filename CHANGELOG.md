@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-04-21
+
+### Fix: Historial Semanal pintaba fechas fin fijas a +7d y "actual" por índice (#23)
+
+**Problema:** El ciclo semanal de Claude es un rolling de 7 días cuyo reset day se mueve (p.ej. jueves → lunes en el caso del usuario). El panel **Semana → Historial Semanal** pintaba:
+
+- **Fechas fin** siempre como `weekId + 7 días`, ignorando que el siguiente ciclo podía arrancar antes → filas consecutivas se pisaban (03-20→03-27 seguido de 03-26→04-02).
+- **Etiqueta "actual"** basada en `i === 0` del array → cuando el dashboard estaba offline (ej. 04-06 a 04-21) la fila más reciente del historial quedaba etiquetada como "actual" aunque su ciclo ya había expirado hacía semanas.
+
+**Fix (`public/index.html`):**
+- La fecha fin de cada fila histórica ahora es el `weekId` de la siguiente entrada (el ciclo de verdad cerró cuando arrancó el siguiente).
+- `isCurrent` se calcula comparando el `weekId` de la fila con el `weekId` del ciclo activo real (derivado de `weeklyResetsAt` via `getWeekCycleInfo()`).
+- Si la fila más reciente no coincide con el ciclo actual, se etiqueta como `(ciclo cerrado)` en vez de `actual`.
+- Badge `⚠ hueco Nd` cuando el span entre ciclos consecutivos excede ~9 días (señal de snapshots perdidos por downtime/PTY fail).
+- `loadGlobalUsage()` ahora dispara `loadWeeklyHistory()` al terminar, para que el render siempre tenga `weeklyResetsAt` cargado.
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/23
+
+
 ## 2026-03-31
 
 ### Fix: Dashboard no cargaba via Tailscale
