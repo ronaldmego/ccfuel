@@ -13,6 +13,7 @@
 - Fallos logueados (incl. `success:false` del PTY), nunca silenciosos.
 - `ecosystem.config.cjs` expone `DASHBOARD_COLLECT_INTERVAL_MIN: 10` explícito.
 - README documenta la env var y aclara que el colector es server-side; el claim "~10 min" ahora coincide con el comportamiento real.
+- `.env.example` documenta `DASHBOARD_COLLECT_INTERVAL_MIN` (faltaba; el resto de la config sí estaba listada).
 
 **Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/24
 
