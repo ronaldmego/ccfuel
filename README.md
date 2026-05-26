@@ -96,6 +96,7 @@ cp .env.example .env
 | `DASHBOARD_HOST` | `127.0.0.1` | Bind address |
 | `DASHBOARD_PORT` | `3400` | Server port |
 | `DASHBOARD_TIMEZONE` | `-5` | UTC offset in hours (e.g., `-5` for EST, `+1` for CET, `0` for UTC) |
+| `DASHBOARD_COLLECT_INTERVAL_MIN` | `10` | Server-side auto-collector cadence in minutes. `0` disables it |
 | `CLAUDE_LOGS_DIR` | `~/.claude` | Path to Claude Code JSONL logs |
 
 ## Architecture
@@ -107,7 +108,7 @@ Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──> 
 ```
 
 - **claude-usage.js** runs Claude Code's `/usage` command via PTY to get account-level percentages
-- Snapshots saved to `data/usage-curve.json` every ~10 min
+- An in-process auto-collector in `server.js` fetches `/usage` and saves a snapshot to `data/usage-curve.json` every `DASHBOARD_COLLECT_INTERVAL_MIN` minutes (default 10), independent of whether the dashboard is open. It primes once ~5s after boot and is guarded against overlapping PTY spawns. Opening the dashboard or hitting `/api/global-usage` still triggers an on-demand refresh on top of the schedule.
 
 ### File Structure
 

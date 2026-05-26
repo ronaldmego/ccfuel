@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-26
+
+### Added: Colector de datos automático server-side (#24)
+
+**Problema:** No existía ningún disparador automático de recolección. El capture de `/usage` (PTY en `claude-usage.js`) solo corría cuando algo pegaba a `/api/global-usage` — es decir, al abrir el dashboard. El polling del frontend (`setInterval` en `index.html`) solo dispara con un browser abierto, así que sin pestaña abierta los snapshots se congelaban (validado: ~18h sin actualizar). Los paneles "Ritmo Actual" y "Proyección de Agotamiento" mostraban `--` por falta de snapshots recientes. La UI/README prometían "~10 min" sin implementarlo.
+
+**Fix (`server.js`):**
+- Núcleo de fetch+snapshot extraído a `fetchAndSnapshot()`, reutilizado por el endpoint `/api/global-usage` y por el nuevo colector (sin duplicar lógica de snapshots).
+- Scheduler in-process: `setInterval` cada `DASHBOARD_COLLECT_INTERVAL_MIN` minutos (default 10, `0` desactiva). Prime ~5s tras boot para poblar paneles sin esperar un intervalo completo.
+- Guard anti-solape reusando `globalUsageCache.fetching` — nunca spawnea sesiones `claude` PTY solapadas (skip, no encola).
+- Fallos logueados (incl. `success:false` del PTY), nunca silenciosos.
+- `ecosystem.config.cjs` expone `DASHBOARD_COLLECT_INTERVAL_MIN: 10` explícito.
+- README documenta la env var y aclara que el colector es server-side; el claim "~10 min" ahora coincide con el comportamiento real.
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/24
+
+
 ## 2026-04-21
 
 ### Fix: Historial Semanal pintaba fechas fin fijas a +7d y "actual" por índice (#23)

@@ -8,6 +8,8 @@ const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3400;
 const HOST = process.env.DASHBOARD_HOST || '127.0.0.1';
 const TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
+// Auto-collector cadence (minutes). 0 disables the in-process scheduler.
+const COLLECT_INTERVAL_MIN = parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '10', 10);
 const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
 const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');
 
@@ -484,24 +486,8 @@ app.get('/api/global-usage', async (req, res) => {
   try {
     globalUsageCache.fetching = true;
     console.log('🔄 Fetching global usage from Claude...');
-    
-    const usage = await getClaudeUsage(false);
-    updatePersistedResets(usage);
-    globalUsageCache.data = usage;
-    globalUsageCache.lastUpdate = new Date().toISOString();
 
-    console.log('✅ Global usage updated:', usage.weekAll?.percent + '% week',
-      usage.weekAll?.resetsAt ? '(resetsAt: ' + usage.weekAll.resetsAt + ')' : '(resetsAt: persisted)');
-
-    // Auto-snapshot weekly efficiency
-    if (usage.weekAll?.percent != null) {
-      try { saveWeeklySnapshot(usage.weekAll.percent); } catch (e) {
-        console.error('Failed to save weekly snapshot:', e.message);
-      }
-      try { saveUsageCurveSnapshot(usage); } catch (e) {
-        console.error('Failed to save usage curve snapshot:', e.message);
-      }
-    }
+    const usage = await fetchAndSnapshot();
 
     res.json({
       ...usage,
@@ -595,7 +581,66 @@ app.get('/api/weekly-history', (req, res) => {
   res.json({ history });
 });
 
+// === Collection core (shared by the HTTP endpoint and the auto-collector) ===
+
+// Fetch /usage via PTY, refresh the cache, and persist snapshots.
+// Throws on PTY/spawn failure so callers can decide how to report it.
+// Callers MUST hold the `globalUsageCache.fetching` guard to avoid overlapping
+// PTY spawns (set it before calling, clear it in a finally block).
+async function fetchAndSnapshot() {
+  const usage = await getClaudeUsage(false);
+  updatePersistedResets(usage);
+  globalUsageCache.data = usage;
+  globalUsageCache.lastUpdate = new Date().toISOString();
+
+  if (!usage.success) {
+    console.warn('⚠️  /usage fetch returned no parseable data:', usage.errorMessage || 'unknown reason');
+  }
+
+  console.log('✅ Global usage updated:', usage.weekAll?.percent + '% week',
+    usage.weekAll?.resetsAt ? '(resetsAt: ' + usage.weekAll.resetsAt + ')' : '(resetsAt: persisted)');
+
+  // Auto-snapshot weekly efficiency + usage curve
+  if (usage.weekAll?.percent != null) {
+    try { saveWeeklySnapshot(usage.weekAll.percent); } catch (e) {
+      console.error('Failed to save weekly snapshot:', e.message);
+    }
+    try { saveUsageCurveSnapshot(usage); } catch (e) {
+      console.error('Failed to save usage curve snapshot:', e.message);
+    }
+  }
+
+  return usage;
+}
+
+// In-process scheduled collection. Skips (does not queue) if a fetch is already
+// running, so we never spawn overlapping `claude` PTY sessions.
+async function scheduledCollect() {
+  if (globalUsageCache.fetching) {
+    console.log('⏭️  Auto-collector skipped: a fetch is already in progress');
+    return;
+  }
+  try {
+    globalUsageCache.fetching = true;
+    console.log(`⏰ Auto-collector running (every ${COLLECT_INTERVAL_MIN} min)...`);
+    await fetchAndSnapshot();
+  } catch (e) {
+    console.error('❌ Auto-collector failed:', e.message);
+  } finally {
+    globalUsageCache.fetching = false;
+  }
+}
+
 // Start server
 app.listen(PORT, HOST, () => {
   console.log(`🚀 Token Dashboard running at http://${HOST}:${PORT}`);
+
+  if (COLLECT_INTERVAL_MIN > 0) {
+    console.log(`📡 Auto-collector enabled: every ${COLLECT_INTERVAL_MIN} min (set DASHBOARD_COLLECT_INTERVAL_MIN=0 to disable)`);
+    // Prime the data shortly after boot so panels populate without waiting a full interval
+    setTimeout(scheduledCollect, 5000);
+    setInterval(scheduledCollect, COLLECT_INTERVAL_MIN * 60 * 1000);
+  } else {
+    console.log('📡 Auto-collector disabled (DASHBOARD_COLLECT_INTERVAL_MIN=0)');
+  }
 });
