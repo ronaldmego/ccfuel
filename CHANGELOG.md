@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-05-30
+
+### Added: Política de restart de PM2 (max_memory_restart + cron_restart) (#26)
+
+**Contexto:** El dashboard corre como proceso PM2 de larga vida (`token-dashboard`, `server.js`). Sano tras ~3.7 días de uptime (~83 MB RSS), pero `ecosystem.config.cjs` no definía ninguna política de restart. Higiene defensiva para el proceso node padre, no un bugfix — auditoría previa confirmó que los hijos `claude` PTY son el auto-colector (cada 10 min, con overlap guard), no fugas.
+
+**Cambio (`ecosystem.config.cjs`):**
+- `max_memory_restart: '250M'` — recicla si el RSS crece.
+- `cron_restart: '0 4 * * *'` — reinicio diario en ventana de bajo tráfico.
+- Aplicado en vivo con `pm2 reload ... --update-env` + `pm2 save`. `pm2 jlist` confirma la política (`262144000` bytes, cron `0 4 * * *`).
+- Verificado: el restart no interrumpe el colector — el overlap guard (`globalUsageCache.fetching`) evita sesiones PTY solapadas y el prime ~5s tras boot repuebla los paneles.
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/26
+
+
 ## 2026-05-26
 
 ### Added: Colector de datos automático server-side (#24)
