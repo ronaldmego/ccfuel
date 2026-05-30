@@ -175,20 +175,54 @@ function saveUsageCurveSnapshot(usage) {
 
 let usageDeltasCache = { data: null, lastUpdate: null };
 
+const DROP_THRESHOLD = 3;   // % drop within a week treated as anomalous (PTY jitter band)
+const SUSTAIN_COUNT = 3;    // consecutive low readings (~30 min) => real level shift, not jitter
+
 function filterAnomalies(snapshots) {
   const filtered = [];
   let lastValid = null;
 
-  for (const s of snapshots) {
-    // Skip PTY failures (weekPercent = 0)
-    if (s.weekPercent === 0) continue;
+  // A drop at `idx` is a transient glitch (single bad /usage read) if the depressed
+  // level does NOT persist for SUSTAIN_COUNT same-week readings — it recovers near the
+  // baseline soon. If it DOES persist, the weekPercent genuinely shifted down (the cycle
+  // can be non-monotonic, e.g. a /usage reset/dip), so we re-baseline instead of freezing
+  // at the prior peak and discarding the rest of the week. See issue #28.
+  const isSustainedShift = (idx, baseline, weekId) => {
+    let n = 0;
+    for (let j = idx; j < snapshots.length && n < SUSTAIN_COUNT; j++) {
+      const s = snapshots[j];
+      if (s.weekId !== weekId) break;
+      if (s.weekPercent >= baseline - DROP_THRESHOLD) return false; // recovered => jitter
+      n++;
+    }
+    return n >= SUSTAIN_COUNT;
+  };
 
-    if (lastValid) {
-      // Skip if weekId goes backwards (jitter)
-      if (s.weekId < lastValid.weekId) continue;
+  for (let i = 0; i < snapshots.length; i++) {
+    const s = snapshots[i];
 
-      // Skip drops >3% within same weekId (anomaly)
-      if (s.weekId === lastValid.weekId && lastValid.weekPercent - s.weekPercent > 3) continue;
+    if (!lastValid) {
+      if (s.weekPercent === 0) continue; // skip leading PTY-failure zeros
+      filtered.push(s);
+      lastValid = s;
+      continue;
+    }
+
+    // weekId going backwards is always jitter
+    if (s.weekId < lastValid.weekId) continue;
+
+    // New week => cycle reset, always accept
+    if (s.weekId !== lastValid.weekId) {
+      filtered.push(s);
+      lastValid = s;
+      continue;
+    }
+
+    // Same week: guard anomalous drops (incl. PTY-failure 0%). Skip only if transient;
+    // re-baseline (fall through) when the lower level is sustained.
+    const drop = lastValid.weekPercent - s.weekPercent;
+    if (drop > DROP_THRESHOLD || s.weekPercent === 0) {
+      if (!isSustainedShift(i, lastValid.weekPercent, s.weekId)) continue;
     }
 
     filtered.push(s);

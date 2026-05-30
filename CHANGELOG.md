@@ -2,6 +2,24 @@
 
 ## 2026-05-30
 
+### Fix: "Ritmo Actual" y chart 48h congelados ante semana no-monotónica (#28)
+
+**Problema:** `filterAnomalies()` asumía que `weekPercent` solo crece dentro de un mismo `weekId`. El ciclo `2026-05-26` (reset confirmado 2026-06-02) fue no-monotónico: subió a 15% el 05-28, cayó a 0% sostenido ~13 lecturas y reconstruyó a 11%. El filtro ancló en el pico de 15% y descartó los 283 snapshots posteriores → "Ritmo Actual" en 0/hr, chart "Consumo por Hora (48h)" vacío, y 315/749 snapshots filtrados. La ingesta cruda estaba sana; el bug era de la capa de deltas.
+
+**Fix (`server.js`):**
+- `filterAnomalies()` ahora distingue jitter transitorio de cambio de nivel sostenido vía lookahead (`isSustainedShift`): un drop >3% o lectura 0% se descarta solo si NO persiste ≥3 lecturas (~30 min) del mismo ciclo; si persiste, re-ancla al nuevo nivel en vez de congelar en el pico.
+- La caída no cuenta como consumo (`computeRawDeltas` ya ignora deltas negativos), pero la subida posterior sí.
+
+**Resultado (validado en vivo + Playwright):**
+- Snapshots válidos: 434 → 694 (filtrados 315 → 57).
+- Último válido: 15% (05-28, congelado) → 11% (05-30, coincide con `/usage` en vivo).
+- "Ritmo Actual": 0/hr → 0.33%/hr (8%/día); chart 48h y proyección de agotamiento (~10 jun) vuelven a poblar.
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/28
+
+
+## 2026-05-30 (PM2 hygiene)
+
 ### Added: Política de restart de PM2 (max_memory_restart + cron_restart) (#26)
 
 **Contexto:** El dashboard corre como proceso PM2 de larga vida (`token-dashboard`, `server.js`). Sano tras ~3.7 días de uptime (~83 MB RSS), pero `ecosystem.config.cjs` no definía ninguna política de restart. Higiene defensiva para el proceso node padre, no un bugfix — auditoría previa confirmó que los hijos `claude` PTY son el auto-colector (cada 10 min, con overlap guard), no fugas.
