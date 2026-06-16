@@ -135,10 +135,12 @@ curl http://localhost:3400/api/global-usage/refresh
 
 ### Estilo Visual
 
-- Tema dark (`#0f0f14` fondo)
-- Paleta: Verde (#4ade80), Cyan (#22d3ee), Purple (#a78bfa), Orange (#f97316)
-- Font: Inter
-- Charts: Chart.js
+- Tema **light corporativo / ejecutivo** (BI). Fondo `#eef1f6`, superficies blancas con sombra suave
+- Acentos: Navy `#1f3a5f`, Azul `#2563a8`. Colores semánticos (Verde `#15803d`, Ámbar `#b45309`, Rojo `#dc2626`) reservados solo para estado
+- Font: IBM Plex Sans (UI) + IBM Plex Mono tabular para cifras/KPIs. Variables CSS en `:root`
+- Iconos: SVG de línea (`stroke="currentColor"`). Sin emojis
+- Charts: Chart.js retematizado para fondo claro (`Chart.defaults` + grids/ticks claros)
+- **Solo datos reales** — no proyecciones/extrapolaciones lineales en la UI
 
 ### Flujo de Cambios
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-16
+
+### Changed: Rediseño UI a tema light corporativo / ejecutivo (#30)
+
+**Contexto:** El dashboard tenía un look de MVP: tema oscuro básico, tipografía Inter genérica, emojis como iconos (📊🎯⛽🕐🔥📈📅), título "Token Dashboard" duplicado (header + cuerpo) y copy informal ("Fuente de Verdad", "Tanque Sesión/Semanal"). Se evolucionó a una interfaz profesional, ejecutiva y corporativa.
+
+**Cambio (`public/index.html`):**
+- **Tema light corporativo (BI):** fondo claro (`#eef1f6`), superficies blancas con sombra suave, acentos navy/azul (`#1f3a5f` / `#2563a8`), colores semánticos (verde/ámbar/rojo) reservados solo para estado. Reemplaza el tema dark.
+- **Tipografía:** IBM Plex Sans (UI) + IBM Plex Mono tabular para cifras/KPIs, en lugar de Inter.
+- **Iconos de línea SVG** (marca, refresh, calendario) y barras de acento en títulos de sección; sin emojis.
+- **Copy profesional:** "Consumo oficial" (antes "Fuente de Verdad"), "Cuota de sesión/semanal" (antes "Tanque"), tabs "Resumen / Semanal"; se elimina el `<h1>` duplicado y se sustituye por un overline de contexto.
+- **Charts retematizados** para fondo claro (grids, ticks, leyendas y paletas).
+- **Se elimina la tarjeta "Proyección de Agotamiento"** (extrapolación lineal que inducía a error) — se conservan solo datos reales medidos; "Ritmo de consumo" se mantiene. Se removió `updateProjectionCard()` y su llamada.
+
+**Sin cambios funcionales** más allá de quitar la proyección: todos los endpoints, IDs de elementos y hooks de JS se preservan.
+
+**Validado (server de producción :3400 + Playwright):** tabs Resumen y Semanal renderizan correctamente en desktop y ancho móvil (390px); 0 errores de consola.
+
+**Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/30
+
+
 ## 2026-05-30
 
 ### Fix: "Ritmo Actual" y chart 48h congelados ante semana no-monotónica (#28)

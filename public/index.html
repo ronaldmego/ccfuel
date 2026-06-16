@@ -4,17 +4,43 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Token Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Claude Usage · Monitor de consumo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
+    :root {
+      --bg: #eef1f6;
+      --surface: #ffffff;
+      --surface-2: #f6f8fb;
+      --border: #e3e8ef;
+      --border-strong: #d3dae4;
+      --ink: #16202e;
+      --ink-2: #5a6573;
+      --ink-3: #8b95a3;
+      --navy: #1f3a5f;
+      --navy-700: #16293f;
+      --accent: #2563a8;
+      --accent-soft: rgba(37,99,168,0.08);
+      --green: #15803d;
+      --amber: #b45309;
+      --red: #dc2626;
+      --shadow-sm: 0 1px 2px rgba(16,24,40,0.05);
+      --shadow: 0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.06);
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0f0f14;
-      color: #e4e4e7;
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "tnum" 1;
     }
 
     /* Header */
@@ -22,56 +48,42 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 24px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      background: rgba(15,15,20,0.95);
+      padding: 14px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
       position: sticky;
       top: 0;
       z-index: 100;
+      box-shadow: var(--shadow-sm);
     }
 
-    .header-left {
+    .brand {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
     }
 
-    .logo {
-      font-size: 1.5em;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .logo-icon {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #a78bfa, #7c3aed);
-      border-radius: 8px;
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(150deg, var(--navy), var(--accent));
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      color: #fff;
+      box-shadow: var(--shadow-sm);
     }
 
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
+    .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .brand-name { font-size: 1.02em; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+    .brand-sub { font-size: 0.7em; font-weight: 500; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
 
-    @media (max-width: 500px) {
-      .header {
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 12px 16px;
-      }
-      .header-right {
-        width: 100%;
-        justify-content: space-between;
-      }
-      .logo { font-size: 1.2em; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    @media (max-width: 560px) {
+      .header { flex-wrap: wrap; gap: 10px; padding: 12px 16px; }
+      .header-right { width: 100%; justify-content: space-between; }
     }
 
     .cycle-selector {
@@ -79,798 +91,252 @@
       align-items: center;
       gap: 8px;
       padding: 8px 12px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px;
-      color: #a1a1aa;
-      font-size: 0.875em;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--ink-2);
+      font-size: 0.82em;
     }
-
+    .cycle-selector svg { color: var(--ink-3); flex-shrink: 0; }
     .cycle-selector select {
-      background: transparent;
-      border: none;
-      color: #e4e4e7;
-      font-family: inherit;
-      font-size: inherit;
-      cursor: pointer;
-      outline: none;
+      background: transparent; border: none; color: var(--ink);
+      font-family: inherit; font-size: inherit; font-weight: 500; cursor: pointer; outline: none;
     }
-
-    .cycle-selector option {
-      background: #1f1f28;
-    }
+    .cycle-selector option { background: #fff; }
+    #cycle-range { font-family: var(--mono); font-weight: 500; color: var(--ink); }
 
     .refresh-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      background: linear-gradient(135deg, #4ade80, #22c55e);
-      border: none;
-      border-radius: 8px;
-      color: #000;
-      font-weight: 600;
-      font-size: 0.875em;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 15px;
+      background: var(--navy);
+      border: 1px solid var(--navy);
+      border-radius: 9px;
+      color: #fff; font-weight: 600; font-size: 0.82em;
+      cursor: pointer; transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
     }
+    .refresh-btn:hover { background: var(--navy-700); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .refresh-btn svg { width: 15px; height: 15px; }
 
-    .refresh-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(74,222,128,0.3);
-    }
+    /* Main */
+    .main { padding: 28px; max-width: 1400px; margin: 0 auto; }
 
-    /* Main Content */
-    .main {
-      padding: 24px;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    /* Page Title */
-    .page-title {
-      margin-bottom: 8px;
-    }
-
-    .page-title h1 {
-      font-size: 1.5em;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .page-subtitle {
-      color: #71717a;
-      font-size: 0.875em;
-      margin-bottom: 24px;
+    .overline {
+      font-size: 0.72em; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--ink-3); margin-bottom: 16px;
     }
 
     /* Tabs */
     .tabs {
-      display: flex;
-      gap: 4px;
-      padding: 4px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 12px;
-      margin-bottom: 24px;
-      width: fit-content;
+      display: flex; gap: 2px; padding: 4px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 11px; margin-bottom: 24px; width: fit-content;
+      box-shadow: var(--shadow-sm);
     }
-
     .tab {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 20px;
-      border: none;
-      background: transparent;
-      color: #71717a;
-      font-family: inherit;
-      font-size: 0.875em;
-      font-weight: 500;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
+      padding: 9px 22px; border: none; background: transparent;
+      color: var(--ink-2); font-family: inherit; font-size: 0.85em; font-weight: 600;
+      border-radius: 8px; cursor: pointer; transition: all 0.15s;
+    }
+    .tab:hover { color: var(--ink); background: var(--surface-2); }
+    .tab.active { background: var(--navy); color: #fff; box-shadow: var(--shadow-sm); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Section card primitives */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
     }
 
-    .tab:hover {
-      color: #a1a1aa;
-    }
-
-    .tab.active {
-      background: rgba(255,255,255,0.08);
-      color: #e4e4e7;
-    }
-
-    .tab-icon {
-      font-size: 1.1em;
-    }
-
-    /* Tab Content */
-    .tab-content {
-      display: none;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    /* Stats Grid - Fixed 4 columns */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    @media (max-width: 1200px) {
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 600px) {
-      .stats-grid { grid-template-columns: 1fr; }
-    }
-
-    /* Stat Card */
-    .stat-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 20px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: var(--accent-color, #4ade80);
-      opacity: 0.8;
-    }
-
-    .stat-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25em;
-      margin-bottom: 12px;
-      background: var(--icon-bg, rgba(74,222,128,0.15));
-    }
-
-    .stat-value {
-      font-size: 2em;
-      font-weight: 700;
-      line-height: 1.1;
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 4px;
     }
-
-    .stat-label {
-      color: #71717a;
-      font-size: 0.8em;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+    .section-title {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.95em; font-weight: 700; color: var(--ink); letter-spacing: -0.01em;
     }
-
-    .stat-sub {
-      color: #52525b;
-      font-size: 0.8em;
+    .section-title::before {
+      content: ''; width: 3px; height: 15px; border-radius: 2px;
+      background: var(--accent); display: inline-block;
     }
+    .section-sub { font-size: 0.78em; color: var(--ink-3); margin-bottom: 16px; }
+    .section-meta { font-size: 0.76em; color: var(--ink-3); }
 
-    .stat-change {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      font-size: 0.75em;
-      font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 6px;
-    }
-
-    .stat-change.up {
-      background: rgba(74,222,128,0.15);
-      color: #4ade80;
-    }
-
-    .stat-change.down {
-      background: rgba(248,113,113,0.15);
-      color: #f87171;
-    }
-
-    /* Progress Bar */
-    .progress-container {
-      margin-top: 12px;
-    }
-
-    .progress-bar {
-      height: 6px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.5s ease;
-    }
-
-    .progress-fill.green { background: linear-gradient(90deg, #4ade80, #22d3ee); }
-    .progress-fill.yellow { background: linear-gradient(90deg, #fbbf24, #f97316); }
-    .progress-fill.red { background: linear-gradient(90deg, #f87171, #ef4444); }
-
-    /* Fuel Gauges */
-    .gauges-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    @media (max-width: 600px) {
-      .gauges-row { grid-template-columns: 1fr; }
-    }
-
-    .gauge-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 20px 20px 16px;
-      text-align: center;
-    }
-
-    .gauge-title {
-      font-size: 0.75em;
-      font-weight: 600;
-      color: #a1a1aa;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 4px;
-    }
-
-    .gauge-svg {
-      width: 100%;
-      max-width: 220px;
-      margin: 0 auto;
-      display: block;
-    }
-
-    .gauge-info {
-      font-size: 0.8em;
-      color: #71717a;
-      margin-top: 4px;
-    }
-
-    .gauge-detail {
-      font-size: 0.72em;
-      color: #52525b;
-      margin-top: 2px;
-    }
-
-    /* Color variants */
-    .green { color: #4ade80; }
-    .yellow { color: #fbbf24; }
-    .red { color: #f87171; }
-    .purple { color: #a78bfa; }
-    .cyan { color: #22d3ee; }
-
-    /* Charts Grid - Fixed 2 columns, same height */
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    @media (max-width: 900px) {
-      .charts-grid { grid-template-columns: 1fr; }
-    }
-
-    .chart-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .chart-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-
-    .chart-title {
-      font-size: 0.95em;
-      font-weight: 600;
-      color: #a1a1aa;
-    }
-
-    .chart-legend {
-      display: flex;
-      gap: 16px;
-      font-size: 0.75em;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #71717a;
-    }
-
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 3px;
-    }
-
-    /* Fixed chart wrapper height for alignment */
-    .chart-wrapper {
-      height: 280px;
-      position: relative;
-    }
-
-    .chart-wrapper canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    /* Global Usage Card (Source of Truth) */
+    /* Official usage panel */
     .global-usage-card {
-      background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(167,139,250,0.05));
-      border: 1px solid rgba(167,139,250,0.3);
-      border-radius: 16px;
-      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--navy);
+      border-radius: var(--radius);
+      padding: 22px;
       margin-bottom: 16px;
+      box-shadow: var(--shadow);
     }
-
     .global-usage-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
     }
+    .global-usage-title { font-size: 0.95em; font-weight: 700; color: var(--ink); }
+    .global-usage-title small { font-weight: 500; color: var(--ink-3); font-size: 0.78em; margin-left: 8px; }
 
-    .global-usage-title {
-      font-size: 1em;
-      font-weight: 600;
-      color: #a78bfa;
+    .icon-btn {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px; cursor: pointer; color: var(--ink-2);
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
     }
-
-    .global-refresh-btn {
-      background: rgba(167,139,250,0.2);
-      border: 1px solid rgba(167,139,250,0.3);
-      border-radius: 8px;
-      padding: 6px 10px;
-      cursor: pointer;
-      font-size: 0.9em;
-      transition: all 0.2s;
-    }
-
-    .global-refresh-btn:hover {
-      background: rgba(167,139,250,0.3);
-    }
-
-    .global-refresh-btn.loading {
-      opacity: 0.5;
-      pointer-events: none;
-    }
+    .icon-btn:hover { background: #fff; color: var(--accent); border-color: var(--border-strong); }
+    .icon-btn.loading { opacity: 0.5; pointer-events: none; }
+    .icon-btn svg { width: 15px; height: 15px; }
 
     .global-usage-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px;
     }
+    @media (max-width: 800px) { .global-usage-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .global-usage-grid { grid-template-columns: 1fr; } }
 
-    @media (max-width: 800px) {
-      .global-usage-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 500px) {
-      .global-usage-grid { grid-template-columns: 1fr; }
-    }
-
-    .global-usage-item {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .global-usage-item.extra {
-      justify-content: center;
-      align-items: center;
-    }
-
+    .global-usage-item { display: flex; flex-direction: column; gap: 8px; }
+    .global-usage-item.extra { justify-content: center; align-items: flex-start; }
     .global-usage-label {
-      font-size: 0.75em;
-      color: #71717a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-size: 0.72em; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
     }
+    .global-usage-bar { height: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .global-usage-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--navy)); border-radius: 4px; transition: width 0.5s ease; }
+    .global-usage-fill.sonnet { background: linear-gradient(90deg, #4f46e5, #6d28d9); }
+    .global-usage-value { font-family: var(--mono); font-size: 1.5em; font-weight: 600; color: var(--ink); line-height: 1; }
+    .global-usage-reset { font-size: 0.7em; color: var(--ink-3); margin-top: 2px; }
+    .global-usage-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.74em; color: var(--ink-3); text-align: right; }
 
-    .global-usage-bar {
-      height: 8px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 4px;
-      overflow: hidden;
+    /* Quota gauges */
+    .gauges-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 600px) { .gauges-row { grid-template-columns: 1fr; } }
+
+    .gauge-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 20px 16px; text-align: center; box-shadow: var(--shadow-sm); }
+    .gauge-title { font-size: 0.72em; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 6px; }
+    .gauge-svg { width: 100%; max-width: 220px; margin: 0 auto; display: block; }
+    .gauge-info { font-size: 0.8em; color: var(--ink-2); margin-top: 6px; }
+    .gauge-detail { font-size: 0.72em; color: var(--ink-3); margin-top: 3px; }
+
+    /* status text utilities */
+    .green { color: var(--green); }
+    .yellow { color: var(--amber); }
+    .red { color: var(--red); }
+    .purple { color: var(--accent); }
+    .cyan { color: #0e7490; }
+
+    /* Charts grid */
+    .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; box-shadow: var(--shadow-sm); }
+    .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+    .chart-title { font-size: 0.9em; font-weight: 700; color: var(--ink); }
+    .chart-note { font-size: 0.72em; color: var(--ink-3); margin-top: 8px; }
+    .chart-wrapper { height: 280px; position: relative; }
+    .chart-wrapper canvas { width: 100% !important; height: 100% !important; }
+    .legend-pills { display: flex; gap: 12px; font-size: 0.72em; color: var(--ink-2); flex-wrap: wrap; }
+    .legend-pills span { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+    /* Generic section card (patterns) */
+    .pattern-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+    .comparison-wrapper { height: 280px; position: relative; }
+    .comparison-wrapper canvas { width: 100% !important; height: 100% !important; }
+    .comparison-summary { margin-top: 14px; padding: 11px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; font-size: 0.8em; color: var(--ink-2); }
+    .comparison-summary strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+
+    /* Single KPI strip (rate) */
+    .kpi-row { margin-bottom: 16px; }
+    .kpi-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent); border-radius: var(--radius);
+      padding: 18px 22px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+      box-shadow: var(--shadow-sm); flex-wrap: wrap;
     }
+    .kpi-label { font-size: 0.78em; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.05em; }
+    .kpi-right { text-align: right; }
+    .kpi-value { font-family: var(--mono); font-size: 2em; font-weight: 600; line-height: 1; color: var(--ink); }
+    .kpi-sub { font-size: 0.78em; color: var(--ink-3); margin-top: 4px; }
 
-    .global-usage-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #4ade80, #22d3ee);
-      border-radius: 4px;
-      transition: width 0.5s ease;
+    /* Heatmap */
+    .delta-heatmap-grid { display: grid; grid-template-columns: 52px repeat(24, 1fr); gap: 2px; margin-bottom: 8px; min-width: 420px; }
+    #delta-heatmap-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .delta-heatmap-legend-gradient { width: 120px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, rgba(37,99,168,0.1), rgba(31,58,95,1)); border: 1px solid var(--border); }
+    .heatmap-row-label { font-size: 0.7em; color: var(--ink-2); display: flex; align-items: center; padding-right: 4px; white-space: nowrap; }
+    .heatmap-hour-label { font-size: 0.64em; color: var(--ink-3); text-align: center; padding-bottom: 2px; }
+    .heatmap-cell { aspect-ratio: 1.6; min-height: 16px; border-radius: 3px; transition: opacity 0.2s; position: relative; }
+    .heatmap-cell:hover { outline: 1px solid var(--navy); z-index: 1; }
+    .heatmap-cell[data-tip]:hover::after {
+      content: attr(data-tip); position: absolute; bottom: calc(100% + 4px); left: 50%;
+      transform: translateX(-50%); background: var(--navy); padding: 4px 8px; border-radius: 6px;
+      font-size: 11px; color: #fff; white-space: nowrap; z-index: 10; pointer-events: none; box-shadow: var(--shadow);
     }
+    .heatmap-legend { display: flex; align-items: center; gap: 6px; justify-content: center; margin-top: 4px; font-size: 0.72em; color: var(--ink-3); }
 
-    .global-usage-fill.sonnet {
-      background: linear-gradient(90deg, #a78bfa, #7c3aed);
-    }
-
-    .global-usage-value {
-      font-size: 1.25em;
-      font-weight: 700;
-      color: #e4e4e7;
-    }
-
-    .global-usage-footer {
-      margin-top: 12px;
-      font-size: 0.75em;
-      color: #52525b;
-      text-align: right;
-    }
-
-    /* Efficiency Card */
-    .eff-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-
-    .eff-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-
-    .eff-title {
-      font-size: 0.95em;
-      font-weight: 600;
-      color: #a1a1aa;
-    }
-
-    .eff-main {
-      display: flex;
-      align-items: center;
-      gap: 32px;
-      margin-bottom: 16px;
-    }
-
-    @media (max-width: 600px) {
-      .eff-main { flex-direction: column; gap: 16px; align-items: flex-start; }
-    }
-
-    .eff-big {
-      text-align: center;
-    }
-
-    .eff-big-number {
-      font-size: 3em;
-      font-weight: 700;
-      line-height: 1;
-    }
-
-    .eff-big-label {
-      font-size: 0.75em;
-      color: #71717a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 4px;
-    }
-
-    .eff-bar {
-      height: 12px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 6px;
-      overflow: hidden;
-      margin-bottom: 16px;
-      position: relative;
-    }
-
-    .eff-bar-used {
-      height: 100%;
-      border-radius: 6px;
-      transition: width 0.5s ease;
-    }
-
+    /* Semana tab */
+    .eff-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+    .eff-main { display: flex; align-items: center; gap: 40px; margin: 18px 0 16px; }
+    @media (max-width: 600px) { .eff-main { flex-direction: column; gap: 16px; align-items: flex-start; } }
+    .eff-big { text-align: center; }
+    .eff-big-number { font-family: var(--mono); font-size: 2.8em; font-weight: 600; line-height: 1; }
+    .eff-big-label { font-size: 0.72em; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; }
+    .eff-bar { height: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 12px; position: relative; }
+    .eff-bar-used { height: 100%; border-radius: 6px 0 0 6px; transition: width 0.5s ease; }
     .eff-bar-risk {
-      position: absolute;
-      top: 0;
-      right: 0;
-      height: 100%;
-      background: repeating-linear-gradient(
-        -45deg,
-        rgba(248,113,113,0.15),
-        rgba(248,113,113,0.15) 4px,
-        transparent 4px,
-        transparent 8px
-      );
+      position: absolute; top: 0; right: 0; height: 100%;
+      background: repeating-linear-gradient(-45deg, rgba(220,38,38,0.14), rgba(220,38,38,0.14) 4px, transparent 4px, transparent 8px);
       border-radius: 0 6px 6px 0;
     }
 
-    /* History table */
-    .eff-history-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8em;
-    }
-
-    .eff-history-table th {
-      text-align: left;
-      padding: 8px 6px;
-      color: #71717a;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      font-weight: 500;
-    }
-
-    .eff-history-table th:not(:first-child) {
-      text-align: right;
-    }
-
-    .eff-history-table td {
-      padding: 10px 6px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-
-    .eff-history-table td:not(:first-child) {
-      text-align: right;
-    }
-
-    .eff-week-bar {
-      display: inline-block;
-      height: 6px;
-      border-radius: 3px;
-      margin-right: 8px;
-      vertical-align: middle;
-    }
-
-    /* Patterns tab */
-    .pattern-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-
-    .pattern-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 4px;
-    }
-
-    .pattern-card-title {
-      font-size: 0.95em;
-      font-weight: 600;
-      color: #a1a1aa;
-    }
-
-    .pattern-card-subtitle {
-      font-size: 0.75em;
-      color: #52525b;
-      margin-bottom: 16px;
-    }
-
-    .comparison-wrapper {
-      height: 280px;
-      position: relative;
-    }
-
-    .comparison-wrapper canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    .comparison-summary {
-      margin-top: 12px;
-      padding: 10px 14px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 8px;
-      font-size: 0.8em;
-      color: #71717a;
-    }
-
-    .comparison-summary strong {
-      color: #e4e4e7;
-    }
-
-    .pattern-empty {
-      text-align: center;
-      padding: 40px 20px;
-      color: #52525b;
-      font-size: 0.9em;
-    }
-
-    /* Consumo Tab */
-    .consumo-cards {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    @media (max-width: 600px) {
-      .consumo-cards { grid-template-columns: 1fr; }
-    }
-
-    .consumo-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 20px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .consumo-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: var(--accent-color, #22d3ee);
-      opacity: 0.8;
-    }
-
-    .consumo-card-label {
-      font-size: 0.75em;
-      color: #71717a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-
-    .consumo-card-value {
-      font-size: 2.2em;
-      font-weight: 700;
-      line-height: 1.1;
-      margin-bottom: 4px;
-    }
-
-    .consumo-card-sub {
-      font-size: 0.8em;
-      color: #52525b;
-    }
-
-    .consumo-meta {
-      font-size: 0.75em;
-      color: #52525b;
-      text-align: center;
-      padding: 8px;
-      margin-top: 8px;
-    }
-
-    .delta-heatmap-grid {
-      display: grid;
-      grid-template-columns: 52px repeat(24, 1fr);
-      gap: 2px;
-      margin-bottom: 8px;
-      min-width: 420px;
-    }
-
-    #delta-heatmap-container {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .delta-heatmap-legend-gradient {
-      width: 120px;
-      height: 10px;
-      border-radius: 5px;
-      background: linear-gradient(90deg, rgba(34,211,238,0.08), rgba(34,211,238,1));
-    }
-
-    /* Heatmap shared (delta heatmap in Consumo) */
-    .heatmap-row-label {
-      font-size: 0.7em;
-      color: #71717a;
-      display: flex;
-      align-items: center;
-      padding-right: 4px;
-      white-space: nowrap;
-    }
-
-    .heatmap-hour-label {
-      font-size: 0.65em;
-      color: #52525b;
-      text-align: center;
-      padding-bottom: 2px;
-    }
-
-    .heatmap-cell {
-      aspect-ratio: 1.6;
-      min-height: 16px;
-      border-radius: 3px;
-      transition: opacity 0.2s;
-      position: relative;
-    }
-
-    .heatmap-cell:hover {
-      outline: 1px solid rgba(255,255,255,0.3);
-      z-index: 1;
-    }
-
-    .heatmap-cell[data-tip]:hover::after {
-      content: attr(data-tip);
-      position: absolute;
-      bottom: calc(100% + 4px);
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1f1f28;
-      border: 1px solid rgba(255,255,255,0.15);
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      color: #e4e4e7;
-      white-space: nowrap;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    .heatmap-legend {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      justify-content: center;
-      margin-top: 4px;
-      font-size: 0.72em;
-      color: #52525b;
-    }
+    .eff-history-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+    .eff-history-table th { text-align: left; padding: 9px 6px; color: var(--ink-3); border-bottom: 1px solid var(--border-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.92em; }
+    .eff-history-table th:not(:first-child) { text-align: right; }
+    .eff-history-table td { padding: 11px 6px; border-bottom: 1px solid var(--border); }
+    .eff-history-table td:not(:first-child) { text-align: right; font-family: var(--mono); }
+    .eff-history-table tr:hover td { background: var(--surface-2); }
+    .eff-week-bar { display: inline-block; height: 6px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
 
     /* Footer */
-    .footer {
-      text-align: center;
-      padding: 16px;
-      color: #52525b;
-      font-size: 0.8em;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      margin-top: 24px;
-    }
+    .footer { text-align: center; padding: 20px; color: var(--ink-3); font-size: 0.78em; border-top: 1px solid var(--border); margin-top: 24px; }
+    .footer span { font-family: var(--mono); color: var(--ink-2); }
   </style>
 </head>
 <body>
   <!-- Header -->
   <header class="header">
-    <div class="header-left">
-      <div class="logo">
-        <div class="logo-icon">📊</div>
-        <span>Token Dashboard</span>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6" y1="20" x2="6" y2="13"></line>
+          <line x1="12" y1="20" x2="12" y2="8"></line>
+          <line x1="18" y1="20" x2="18" y2="4"></line>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">Claude Usage</span>
+        <span class="brand-sub">Monitor de consumo</span>
       </div>
     </div>
     <div class="header-right">
       <div class="cycle-selector">
-        <span>📅</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+        </svg>
         <select id="cycle-select">
-          <option value="current">Ciclo Actual</option>
+          <option value="current">Ciclo actual</option>
         </select>
-        <span id="cycle-range" style="margin-left: 8px; color: #e4e4e7;">—</span>
+        <span id="cycle-range">—</span>
       </div>
       <button class="refresh-btn" onclick="refresh()">
-        <span>🔄</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+          <path d="M21 3v6h-6"></path>
+        </svg>
         <span>Actualizar</span>
       </button>
     </div>
@@ -878,182 +344,155 @@
 
   <!-- Main Content -->
   <main class="main">
-    <div class="page-title">
-      <h1>📊 Token Dashboard</h1>
-    </div>
-    <p class="page-subtitle">Control de stock de tokens Claude</p>
+    <div class="overline">Fuente oficial · Claude /usage · zona horaria UTC−5</div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab active" data-tab="overview">
-        <span class="tab-icon">📈</span>
-        <span>Overview</span>
-      </button>
-      <button class="tab" data-tab="semana">
-        <span class="tab-icon">🎯</span>
-        <span>Semana</span>
-      </button>
+      <button class="tab active" data-tab="overview"><span>Resumen</span></button>
+      <button class="tab" data-tab="semana"><span>Semanal</span></button>
     </div>
 
     <!-- Tab: Overview -->
     <div class="tab-content active" id="tab-overview">
-      <!-- Global Usage (Source of Truth) -->
+      <!-- Official usage -->
       <div class="global-usage-card" id="global-usage-section">
         <div class="global-usage-header">
-          <span class="global-usage-title">🎯 Uso Global (Fuente de Verdad)</span>
-          <button class="global-refresh-btn" onclick="refreshGlobalUsage()" id="global-refresh-btn">
-            <span>🔄</span>
+          <span class="global-usage-title">Consumo oficial<small>reportado por Claude /usage</small></span>
+          <button class="icon-btn" onclick="refreshGlobalUsage()" id="global-refresh-btn" title="Refrescar consumo oficial">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path>
+            </svg>
           </button>
         </div>
         <div class="global-usage-grid">
           <div class="global-usage-item">
-            <div class="global-usage-label">Sesion Actual</div>
-            <div class="global-usage-bar">
-              <div class="global-usage-fill" id="global-session-bar" style="width: 0%"></div>
-            </div>
+            <div class="global-usage-label">Sesión</div>
+            <div class="global-usage-bar"><div class="global-usage-fill" id="global-session-bar" style="width: 0%"></div></div>
             <div class="global-usage-value" id="global-session">—%</div>
-            <div class="global-usage-reset" id="global-session-reset" style="font-size:0.7em;color:#71717a;margin-top:2px;"></div>
+            <div class="global-usage-reset" id="global-session-reset"></div>
           </div>
           <div class="global-usage-item">
-            <div class="global-usage-label">Semana (Todos)</div>
-            <div class="global-usage-bar">
-              <div class="global-usage-fill" id="global-week-bar" style="width: 0%"></div>
-            </div>
+            <div class="global-usage-label">Semanal · Todos</div>
+            <div class="global-usage-bar"><div class="global-usage-fill" id="global-week-bar" style="width: 0%"></div></div>
             <div class="global-usage-value" id="global-week">—%</div>
-            <div class="global-usage-reset" id="global-week-reset" style="font-size:0.7em;color:#71717a;margin-top:2px;"></div>
+            <div class="global-usage-reset" id="global-week-reset"></div>
           </div>
           <div class="global-usage-item">
-            <div class="global-usage-label">Semana (Sonnet)</div>
-            <div class="global-usage-bar">
-              <div class="global-usage-fill sonnet" id="global-sonnet-bar" style="width: 0%"></div>
-            </div>
+            <div class="global-usage-label">Semanal · Sonnet</div>
+            <div class="global-usage-bar"><div class="global-usage-fill sonnet" id="global-sonnet-bar" style="width: 0%"></div></div>
             <div class="global-usage-value" id="global-sonnet">—%</div>
-            <div class="global-usage-reset" id="global-sonnet-reset" style="font-size:0.7em;color:#71717a;margin-top:2px;"></div>
+            <div class="global-usage-reset" id="global-sonnet-reset"></div>
           </div>
           <div class="global-usage-item extra" id="global-extra-container" style="display:none;">
-            <div class="global-usage-label">Extra Usage</div>
+            <div class="global-usage-label">Uso adicional</div>
             <div class="global-usage-value" id="global-extra">—</div>
           </div>
         </div>
-
         <div class="global-usage-footer" id="global-usage-footer">
-          <span id="global-usage-status">Cargando...</span>
+          <span id="global-usage-status">Cargando…</span>
         </div>
       </div>
 
-      <!-- Fuel Gauges -->
+      <!-- Quota gauges -->
       <div class="gauges-row">
         <div class="gauge-card">
-          <div class="gauge-title">Tanque Sesion</div>
+          <div class="gauge-title">Cuota de sesión</div>
           <svg viewBox="0 0 200 115" class="gauge-svg">
-            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1f1f28" stroke-width="14" stroke-linecap="round"/>
-            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#2a2a35" stroke-width="14" stroke-linecap="round"
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"
               id="session-gauge-arc" stroke-dasharray="0 251"/>
-            <text x="15" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">F</text>
-            <text x="181" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">E</text>
-            <text x="100" y="78" text-anchor="middle" fill="#71717a" font-size="28" font-weight="700" font-family="Inter" id="session-gauge-val">—</text>
-            <text x="100" y="96" text-anchor="middle" fill="#52525b" font-size="11" font-family="Inter" id="session-gauge-label">restante</text>
+            <text x="100" y="78" text-anchor="middle" fill="#16202e" font-size="28" font-weight="600" font-family="'IBM Plex Mono', monospace" id="session-gauge-val">—</text>
+            <text x="100" y="96" text-anchor="middle" fill="#8b95a3" font-size="11" font-family="'IBM Plex Sans', sans-serif" id="session-gauge-label">restante</text>
           </svg>
-          <div class="gauge-info" id="session-gauge-info">Cargando...</div>
+          <div class="gauge-info" id="session-gauge-info">Cargando…</div>
         </div>
 
         <div class="gauge-card">
-          <div class="gauge-title">Tanque Semanal</div>
+          <div class="gauge-title">Cuota semanal</div>
           <svg viewBox="0 0 200 115" class="gauge-svg">
-            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1f1f28" stroke-width="14" stroke-linecap="round"/>
-            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#2a2a35" stroke-width="14" stroke-linecap="round"
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"
               id="week-gauge-arc" stroke-dasharray="0 251"/>
-            <text x="15" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">F</text>
-            <text x="181" y="113" fill="#52525b" font-size="10" font-family="Inter" font-weight="600">E</text>
-            <text x="100" y="78" text-anchor="middle" fill="#71717a" font-size="28" font-weight="700" font-family="Inter" id="week-gauge-val">—</text>
-            <text x="100" y="96" text-anchor="middle" fill="#52525b" font-size="11" font-family="Inter" id="week-gauge-label">restante</text>
+            <text x="100" y="78" text-anchor="middle" fill="#16202e" font-size="28" font-weight="600" font-family="'IBM Plex Mono', monospace" id="week-gauge-val">—</text>
+            <text x="100" y="96" text-anchor="middle" fill="#8b95a3" font-size="11" font-family="'IBM Plex Sans', sans-serif" id="week-gauge-label">restante</text>
           </svg>
-          <div class="gauge-info" id="week-gauge-info">Cargando...</div>
+          <div class="gauge-info" id="week-gauge-info">Cargando…</div>
           <div class="gauge-detail" id="week-gauge-detail"></div>
         </div>
       </div>
 
-      <!-- Week Comparison (% acumulado) -->
+      <!-- Cumulative consumption vs previous weeks -->
       <div class="pattern-card">
-        <div class="pattern-card-header">
-          <span class="pattern-card-title">📊 Consumo: Esta Semana vs...</span>
+        <div class="section-head">
+          <span class="section-title">Consumo acumulado</span>
         </div>
-        <div class="pattern-card-subtitle">% acumulado por hora del ciclo (fuente: Claude /usage)</div>
+        <div class="section-sub">% acumulado por hora del ciclo · fuente Claude /usage</div>
         <div id="comparison-week-selector" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
         <div id="comparison-container">
-          <div class="comparison-wrapper">
-            <canvas id="comparisonChart"></canvas>
-          </div>
+          <div class="comparison-wrapper"><canvas id="comparisonChart"></canvas></div>
           <div class="comparison-summary" id="comparison-summary"></div>
         </div>
       </div>
 
-      <!-- Consumo Section (previously separate tab) -->
-      <div class="consumo-cards">
-        <div class="consumo-card" style="--accent-color: #22d3ee;">
-          <div class="consumo-card-label">Ritmo Actual (ultimas 6h)</div>
-          <div class="consumo-card-value cyan" id="consumo-rate">--</div>
-          <div class="consumo-card-sub" id="consumo-rate-sub">%/hora</div>
-        </div>
-        <div class="consumo-card" style="--accent-color: #a78bfa;">
-          <div class="consumo-card-label">Proyeccion de Agotamiento</div>
-          <div class="consumo-card-value purple" id="consumo-projection">--</div>
-          <div class="consumo-card-sub" id="consumo-projection-sub">estimado</div>
+      <!-- Current rate (measured, real data) -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-label">Ritmo de consumo</span>
+          <div class="kpi-right">
+            <div class="kpi-value" id="consumo-rate">—</div>
+            <div class="kpi-sub" id="consumo-rate-sub">%/hora</div>
+          </div>
         </div>
       </div>
 
       <div class="charts-grid">
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">⛽ Consumo Diario (delta %)</span>
-            <div style="display:flex; gap:12px; font-size:0.75em; color:#71717a;">
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#22d3ee;display:inline-block;"></span> ≤10%</span>
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#fbbf24;display:inline-block;"></span> >10%</span>
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#f87171;display:inline-block;"></span> >15%</span>
+            <span class="chart-title">Consumo diario</span>
+            <div class="legend-pills">
+              <span><span class="legend-dot" style="background:#2563a8"></span> ≤10%</span>
+              <span><span class="legend-dot" style="background:#d97706"></span> &gt;10%</span>
+              <span><span class="legend-dot" style="background:#dc2626"></span> &gt;15%</span>
             </div>
           </div>
-          <div class="chart-wrapper">
-            <canvas id="deltaDailyChart"></canvas>
-          </div>
-          <div style="font-size:0.7em; color:#52525b; margin-top:6px;">Cambio porcentual por dia, derivado de snapshots de /usage cada ~10 min.</div>
+          <div class="chart-wrapper"><canvas id="deltaDailyChart"></canvas></div>
+          <div class="chart-note">Cambio porcentual por día, derivado de snapshots de /usage cada ~10 min.</div>
         </div>
 
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">🕐 Consumo por Hora (48h)</span>
+            <span class="chart-title">Consumo por hora · 48h</span>
           </div>
-          <div class="chart-wrapper">
-            <canvas id="deltaHourlyChart"></canvas>
-          </div>
+          <div class="chart-wrapper"><canvas id="deltaHourlyChart"></canvas></div>
         </div>
       </div>
 
       <div class="pattern-card">
-        <div class="pattern-card-header">
-          <span class="pattern-card-title">🔥 Patron de Uso</span>
-          <span style="font-size:0.75em; color:#52525b;" id="heatmap-weeks-info"></span>
+        <div class="section-head">
+          <span class="section-title">Patrón de actividad</span>
+          <span class="section-meta" id="heatmap-weeks-info"></span>
         </div>
-        <div class="pattern-card-subtitle">Intensidad promedio por dia de semana y hora — cyan = mas consumo</div>
+        <div class="section-sub">Intensidad promedio por día de la semana y hora — más oscuro = mayor consumo</div>
         <div id="delta-heatmap-container">
           <div id="delta-heatmap-grid" class="delta-heatmap-grid"></div>
           <div class="heatmap-legend">
             <span>Menos</span>
             <div class="delta-heatmap-legend-gradient"></div>
-            <span>Mas</span>
+            <span>Más</span>
           </div>
         </div>
       </div>
 
-      <div class="consumo-meta" id="consumo-meta">Cargando datos de consumo...</div>
+      <div class="section-meta" id="consumo-meta" style="text-align:center; padding:8px;">Cargando datos de consumo…</div>
     </div>
 
     <!-- Tab: Semana -->
     <div class="tab-content" id="tab-semana">
       <!-- Current Week -->
       <div class="eff-card">
-        <div class="eff-header">
-          <span class="eff-title">📊 Esta Semana</span>
-          <span style="font-size: 0.8em; color: #52525b;" id="eff-day-info">—</span>
+        <div class="section-head">
+          <span class="section-title">Esta semana</span>
+          <span class="section-meta" id="eff-day-info">—</span>
         </div>
 
         <div class="eff-main">
@@ -1068,18 +507,18 @@
         </div>
 
         <div class="eff-bar" id="eff-bar">
-          <div class="eff-bar-used" id="eff-bar-used" style="width: 0%; background: linear-gradient(90deg, #4ade80, #22d3ee);"></div>
+          <div class="eff-bar-used" id="eff-bar-used" style="width: 0%; background: linear-gradient(90deg, #2563a8, #1f3a5f);"></div>
           <div class="eff-bar-risk" id="eff-bar-risk" style="width: 0%;"></div>
         </div>
-        <div id="eff-speed-info" style="margin-top:8px; font-size:0.8em; color:#71717a;"></div>
+        <div id="eff-speed-info" style="margin-top:8px; font-size:0.8em; color:var(--ink-2);"></div>
       </div>
 
       <!-- Weekly Cumulative Curves Chart -->
       <div class="eff-card">
-        <div class="eff-header">
-          <span class="eff-title">📈 Curvas Semanales</span>
+        <div class="section-head">
+          <span class="section-title">Curvas semanales</span>
         </div>
-        <div style="font-size:0.75em; color:#52525b; margin-bottom:8px;">% acumulado por dia del ciclo — una linea por semana</div>
+        <div class="section-sub">% acumulado por día del ciclo — una línea por semana</div>
         <div style="position:relative; height:420px;">
           <canvas id="weeklyCurvesChart"></canvas>
         </div>
@@ -1087,34 +526,38 @@
 
       <!-- Weekly History -->
       <div class="eff-card">
-        <div class="eff-header">
-          <span class="eff-title">📅 Historial Semanal</span>
+        <div class="section-head">
+          <span class="section-title">Historial semanal</span>
         </div>
-        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top:12px;">
           <table class="eff-history-table">
             <thead>
               <tr>
                 <th>Semana</th>
-                <th>Dia</th>
+                <th>Día</th>
                 <th>% Usado</th>
                 <th>Velocidad</th>
               </tr>
             </thead>
             <tbody id="eff-history-body">
-              <tr><td colspan="4" style="text-align:center; padding: 16px; color: #52525b;">Cargando...</td></tr>
+              <tr><td colspan="4" style="text-align:center; padding: 16px; color: var(--ink-3);">Cargando…</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-        <!-- Footer -->
+    <!-- Footer -->
     <footer class="footer">
-      Ultima actualizacion: <span id="last-update">—</span>
+      Última actualización: <span id="last-update">—</span>
     </footer>
   </main>
 
   <script>
+    // Light corporate chart defaults
+    Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+    Chart.defaults.color = '#6b7280';
+
     let weeklyResetHour = null; // Hour (0-23) when Claude's week resets, from /usage
     let weeklyResetsAt = null;  // Full ISO datetime of next weekly reset, from /usage
 
@@ -1163,7 +606,7 @@
     }
 
     async function refresh() {
-      document.getElementById('global-usage-status').textContent = 'Actualizando...';
+      document.getElementById('global-usage-status').textContent = 'Actualizando…';
       await loadGlobalUsage();
       await loadConsumoTab();
     }
@@ -1238,7 +681,7 @@
       return getWeekCycleInfo().dayNum;
     }
 
-    // Fuel gauge helper
+    // Quota gauge helper
     function updateGauge(arcId, valId, labelId, remaining) {
       const arc = document.getElementById(arcId);
       const val = document.getElementById(valId);
@@ -1247,15 +690,15 @@
       const fillLen = totalLen * Math.max(0, Math.min(remaining, 100)) / 100;
 
       let color;
-      if (remaining > 50) color = '#4ade80';
-      else if (remaining > 20) color = '#fbbf24';
-      else color = '#f87171';
+      if (remaining > 50) color = '#15803d';
+      else if (remaining > 20) color = '#b45309';
+      else color = '#dc2626';
 
       arc.setAttribute('stroke-dasharray', `${fillLen} ${totalLen - fillLen}`);
       arc.setAttribute('stroke', color);
       val.textContent = remaining + '%';
       val.setAttribute('fill', color);
-      if (label) label.setAttribute('fill', '#71717a');
+      if (label) label.setAttribute('fill', '#8b95a3');
     }
 
     function formatResetCountdown(resetsAtISO) {
@@ -1286,17 +729,18 @@
       const countdown = formatResetCountdown(session.resetsAt);
       if (countdown) {
         document.getElementById('session-gauge-info').textContent =
-          `Reset ${countdown.timeLabel} (${countdown.h}h ${countdown.m}m) | ${percent}% usado`;
+          `Reset ${countdown.timeLabel} (${countdown.h}h ${countdown.m}m) · ${percent}% usado`;
       } else {
-        document.getElementById('session-gauge-info').textContent = percent + '% usado | Reset time unavailable';
+        document.getElementById('session-gauge-info').textContent = percent + '% usado · reset no disponible';
       }
     }
 
-    // Global Usage (Source of Truth)
+    // Official usage
     async function loadGlobalUsage(retries = 3) {
       try {
         const statusEl = document.getElementById('global-usage-status');
-        statusEl.textContent = 'Cargando...';
+        statusEl.textContent = 'Cargando…';
+        statusEl.style.color = '';
 
         const res = await fetch('/api/global-usage');
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1309,7 +753,7 @@
 
         if (data.authError) {
           statusEl.textContent = "⚠️ " + (data.errorMessage || "Auth error");
-          statusEl.style.color = "#f87171";
+          statusEl.style.color = "#dc2626";
         } else if (data.session && data.weekAll) {
           document.getElementById('global-session').textContent = data.session.percent + '%';
           document.getElementById('global-week').textContent = data.weekAll.percent + '%';
@@ -1326,30 +770,30 @@
               const label = cd.isMultiDay ? cd.dateLabel : cd.timeLabel;
               el.textContent = `Reset: ${label} (${cd.h}h ${cd.m}m)`;
             } else {
-              el.textContent = 'Reset time unavailable';
+              el.textContent = 'Reset no disponible';
             }
           }
 
           const weekBar = document.getElementById('global-week-bar');
           if (data.weekAll.percent > 80) {
-            weekBar.style.background = 'linear-gradient(90deg, #f87171, #ef4444)';
+            weekBar.style.background = 'linear-gradient(90deg, #dc2626, #b91c1c)';
           } else if (data.weekAll.percent > 50) {
-            weekBar.style.background = 'linear-gradient(90deg, #fbbf24, #f97316)';
+            weekBar.style.background = 'linear-gradient(90deg, #d97706, #b45309)';
           }
 
           const extraContainer = document.getElementById('global-extra-container');
           if (data.extraUsage.enabled) {
             extraContainer.style.display = '';
-            document.getElementById('global-extra').innerHTML = '<span style="color:#4ade80">Enabled</span>';
+            document.getElementById('global-extra').innerHTML = '<span style="color:#15803d">Activo</span>';
           } else if (data.extraUsage.freeAvailable > 0) {
             extraContainer.style.display = '';
-            document.getElementById('global-extra').innerHTML = `<span style="color:#fbbf24">$${data.extraUsage.freeAvailable} free</span>`;
+            document.getElementById('global-extra').innerHTML = `<span style="color:#b45309">$${data.extraUsage.freeAvailable} libre</span>`;
           } else {
             extraContainer.style.display = 'none';
           }
 
           const cacheMinutes = data.cacheAge != null ? Math.round(data.cacheAge / 60) : null;
-          const cacheNote = data.cached ? ` (cache ${cacheMinutes != null ? cacheMinutes + 'm' : '✓'})` : ' (fresh)';
+          const cacheNote = data.cached ? ` · cache ${cacheMinutes != null ? cacheMinutes + 'm' : '✓'}` : ' · en vivo';
           statusEl.textContent = 'Actualizado: ' + new Date(data.timestamp).toLocaleTimeString('es-PA') + cacheNote;
 
           if (data.weekAll.resetsAt != null) {
@@ -1368,15 +812,15 @@
           // Bug fix: if weekly limit reached, session gauge should show 0% remaining
           if (data.weekAll.percent >= 100) {
             updateGauge('session-gauge-arc', 'session-gauge-val', 'session-gauge-label', 0);
-            document.getElementById('session-gauge-info').textContent = 'Limite semanal alcanzado (100%)';
+            document.getElementById('session-gauge-info').textContent = 'Límite semanal alcanzado (100%)';
           }
 
           const weekRemaining = 100 - data.weekAll.percent;
           updateGauge('week-gauge-arc', 'week-gauge-val', 'week-gauge-label', weekRemaining);
           document.getElementById('week-gauge-info').textContent =
-            `Dia ${cycle.dayNum}/7 | ${data.weekAll.percent}% usado`;
+            `Día ${cycle.dayNum}/7 · ${data.weekAll.percent}% usado`;
           document.getElementById('week-gauge-detail').textContent =
-            `${cycle.fmtStart} → ${cycle.fmtEnd} | Reset: ${cycle.resetDateLabel} (${cycle.resetIn})`;
+            `${cycle.fmtStart} → ${cycle.fmtEnd} · Reset: ${cycle.resetDateLabel} (${cycle.resetIn})`;
 
           updateEfficiencyCurrentWeek(data.weekAll.percent);
 
@@ -1395,25 +839,23 @@
           await new Promise(r => setTimeout(r, 2000));
           return loadGlobalUsage(retries - 1);
         }
-        document.getElementById('global-usage-status').textContent = 'Error de conexion - refresca la pagina';
+        document.getElementById('global-usage-status').textContent = 'Error de conexión — refresca la página';
       }
     }
 
     async function refreshGlobalUsage() {
       const btn = document.getElementById('global-refresh-btn');
       btn.classList.add('loading');
-      btn.innerHTML = '⏳';
 
       try {
         await fetch('/api/global-usage/refresh');
         await loadGlobalUsage();
       } finally {
         btn.classList.remove('loading');
-        btn.innerHTML = '<span>🔄</span>';
       }
     }
 
-    // Efficiency tab logic
+    // Weekly tab logic
     function updateEfficiencyCurrentWeek(weekPercent) {
       const cycle = getWeekCycleInfo();
       const riskPercent = 100 - weekPercent;
@@ -1433,14 +875,14 @@
       document.getElementById('eff-bar-risk').style.width = riskPercent + '%';
 
       document.getElementById('eff-day-info').textContent =
-        `Dia ${cycle.dayNum}/7 | ${cycle.fmtStart} → ${cycle.fmtEnd} | Reset: ${cycle.resetDateLabel}`;
+        `Día ${cycle.dayNum}/7 · ${cycle.fmtStart} → ${cycle.fmtEnd} · Reset: ${cycle.resetDateLabel}`;
 
       // Speed info
       const speedEl = document.getElementById('eff-speed-info');
       if (weekPercent >= 100) {
-        speedEl.innerHTML = `<span style="color:#f87171; font-weight:600;">100% en ${cycle.dayNum} dias</span> — limite alcanzado antes del reset`;
+        speedEl.innerHTML = `<span style="color:#dc2626; font-weight:600;">100% en ${cycle.dayNum} días</span> — límite alcanzado antes del reset`;
       } else {
-        speedEl.innerHTML = `<span style="color:#a78bfa;">${weekPercent}% en ${cycle.dayNum} dias</span>`;
+        speedEl.innerHTML = `<span style="color:#2563a8;">${weekPercent}% en ${cycle.dayNum} días</span>`;
       }
     }
 
@@ -1451,7 +893,7 @@
         const tbody = document.getElementById('eff-history-body');
 
         if (!data.history || data.history.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#52525b;">Sin historial aun (se registra automaticamente)</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:var(--ink-3);">Sin historial aún (se registra automáticamente)</td></tr>';
           return;
         }
 
@@ -1470,7 +912,7 @@
 
         tbody.innerHTML = data.history.map((w, i) => {
           const pct = w.weekPercent;
-          const barColor = pct > 80 ? '#4ade80' : pct > 50 ? '#fbbf24' : '#f87171';
+          const barColor = pct > 80 ? '#15803d' : pct > 50 ? '#d97706' : '#dc2626';
           const barWidth = Math.min(pct, 100);
           const isCurrent = currentWeekId ? (w.weekId === currentWeekId) : (i === 0);
 
@@ -1480,7 +922,7 @@
 
           let endLabel, gapBadge = '';
           if (isCurrent) {
-            endLabel = 'hoy <span style="font-size:0.7em;color:#a78bfa">actual</span>';
+            endLabel = 'hoy <span style="font-size:0.78em;color:#2563a8;font-weight:600">actual</span>';
           } else if (nextEntry) {
             const nextStart = new Date(nextEntry.weekId + 'T00:00:00Z');
             endLabel = fmtMMDD(nextStart);
@@ -1489,13 +931,13 @@
             const spanDays = Math.round((nextStart - startDate) / 86400000);
             if (spanDays > 9) {
               const gapDays = spanDays - 7;
-              gapBadge = ` <span style="font-size:0.7em;color:#fbbf24" title="~${gapDays}d sin snapshots entre ciclos">⚠ hueco ${gapDays}d</span>`;
+              gapBadge = ` <span style="font-size:0.78em;color:#b45309" title="~${gapDays}d sin snapshots entre ciclos">⚠ hueco ${gapDays}d</span>`;
             }
           } else {
             // Top row but not the current cycle → ciclo cerrado sin snapshot nuevo
             const fallbackEnd = new Date(startDate);
             fallbackEnd.setUTCDate(fallbackEnd.getUTCDate() + 7);
-            endLabel = fmtMMDD(fallbackEnd) + ' <span style="font-size:0.7em;color:#71717a">(ciclo cerrado)</span>';
+            endLabel = fmtMMDD(fallbackEnd) + ' <span style="font-size:0.78em;color:var(--ink-3)">(ciclo cerrado)</span>';
           }
           const weekLabel = startStr + ' → ' + endLabel + gapBadge;
 
@@ -1510,24 +952,24 @@
             const offH = Math.round(w.offlineHours % 24);
             const offLabel = offD > 0 ? `${offD}d${offH}h` : `${offH}h`;
 
-            const offColor = w.offlineHours >= 24 ? '#f87171' : w.offlineHours > 0 ? '#fbbf24' : '#4ade80';
+            const offColor = w.offlineHours >= 24 ? '#dc2626' : w.offlineHours > 0 ? '#b45309' : '#15803d';
             velocityText = w.offlineHours > 0
               ? `<span style="color:${offColor}">en ${usedLabel} → ${offLabel} offline</span>`
-              : `<span style="color:#4ade80">en ${usedLabel}</span>`;
+              : `<span style="color:#15803d">en ${usedLabel}</span>`;
           } else if (pct >= 100) {
-            velocityText = `<span style="color:#4ade80">completo</span>`;
+            velocityText = `<span style="color:#15803d">completo</span>`;
           } else {
-            velocityText = `<span style="color:#71717a">${100 - pct}% libre</span>`;
+            velocityText = `<span style="color:var(--ink-3)">${100 - pct}% libre</span>`;
           }
 
-          return `<tr${isCurrent ? ' style="background:rgba(255,255,255,0.03)"' : ''}>
-            <td style="white-space:nowrap;">${weekLabel}</td>
+          return `<tr${isCurrent ? ' style="background:rgba(31,58,95,0.05)"' : ''}>
+            <td style="white-space:nowrap; font-family:'IBM Plex Sans',sans-serif;">${weekLabel}</td>
             <td>${w.dayNum}/7</td>
             <td>
               <span class="eff-week-bar" style="width:${barWidth * 0.6}px; background:${barColor};"></span>
               <span style="color:${barColor}; font-weight:600;">${pct}%</span>
             </td>
-            <td style="font-size:0.85em;">${velocityText}</td>
+            <td style="font-size:0.85em; font-family:'IBM Plex Sans',sans-serif;">${velocityText}</td>
           </tr>`;
         }).join('');
       } catch (e) {
@@ -1576,16 +1018,16 @@
       // Ideal pace line
       const idealData = Array.from({length: 168}, (_, i) => Math.round((i / 167) * 100 * 100) / 100);
 
-      // Distinct colors for historical weeks (most recent = brightest)
+      // Distinct colors for historical weeks (readable on light bg; most recent = brightest)
       const histColors = [
-        '#f97316', // orange
-        '#22d3ee', // cyan
-        '#f472b6', // pink
-        '#facc15', // yellow
-        '#a78bfa', // purple
-        '#34d399', // emerald
-        '#fb923c', // light orange
-        '#38bdf8', // sky blue
+        '#ea580c', // orange
+        '#0e7490', // teal
+        '#db2777', // pink
+        '#ca8a04', // gold
+        '#7c3aed', // violet
+        '#059669', // emerald
+        '#d97706', // amber
+        '#0284c7', // sky
       ];
 
       const datasets = [];
@@ -1610,7 +1052,7 @@
         });
       });
 
-      // Current week (green, filled)
+      // Current week (navy, filled)
       if (curves[currentWeekId]) {
         const currentData = buildDailyArray(curves[currentWeekId]);
         const lastPoint = curves[currentWeekId][curves[currentWeekId].length - 1];
@@ -1620,8 +1062,8 @@
         datasets.push({
           label: 'Esta semana',
           data: trimmed,
-          borderColor: '#4ade80',
-          backgroundColor: 'rgba(74,222,128,0.08)',
+          borderColor: '#1f3a5f',
+          backgroundColor: 'rgba(31,58,95,0.08)',
           borderWidth: 2.5,
           fill: true,
           tension: 0.3,
@@ -1634,7 +1076,7 @@
       datasets.push({
         label: 'Ritmo ideal',
         data: idealData,
-        borderColor: 'rgba(167,139,250,0.3)',
+        borderColor: 'rgba(100,116,139,0.5)',
         borderDash: [8, 4],
         borderWidth: 1.5,
         fill: false,
@@ -1656,7 +1098,7 @@
               position: 'top',
               align: 'end',
               labels: {
-                color: '#71717a',
+                color: '#6b7280',
                 font: { size: 10 },
                 boxWidth: 10,
                 padding: 8
@@ -1671,7 +1113,7 @@
           scales: {
             x: {
               ticks: {
-                color: '#52525b',
+                color: '#94a3b8',
                 font: { size: 10 },
                 maxRotation: 0,
                 callback: function(val, idx) {
@@ -1680,7 +1122,7 @@
               },
               grid: {
                 color: function(ctx) {
-                  return ctx.index % 24 === 0 ? 'rgba(255,255,255,0.1)' : 'transparent';
+                  return ctx.index % 24 === 0 ? 'rgba(20,30,48,0.1)' : 'transparent';
                 },
                 lineWidth: function(ctx) {
                   return ctx.index % 24 === 0 ? 1 : 0;
@@ -1692,11 +1134,11 @@
               min: 0,
               max: 100,
               ticks: {
-                color: '#52525b',
+                color: '#94a3b8',
                 font: { size: 11 },
                 callback: v => v + '%'
               },
-              grid: { display: false }
+              grid: { color: 'rgba(20,30,48,0.06)' }
             }
           }
         }
@@ -1717,7 +1159,7 @@
       }
     }
 
-    // === Patterns Tab ===
+    // === Cumulative comparison (Overview) ===
     let comparisonChart = null;
     let comparisonCurvesCache = null;
     let comparisonCurrentWeekId = null;
@@ -1737,9 +1179,9 @@
         const dateLabel = (d.getUTCMonth()+1).toString().padStart(2,'0') + '-' + d.getUTCDate().toString().padStart(2,'0');
         const selected = (comparisonSelectedWeekId || recent[0]) === wid;
         return `<button class="comp-week-btn${selected ? ' active' : ''}" data-wid="${wid}" style="
-          padding:4px 10px; border-radius:6px; border:1px solid ${selected ? '#a78bfa' : 'rgba(255,255,255,0.1)'};
-          background:${selected ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.03)'};
-          color:${selected ? '#c4b5fd' : '#71717a'}; font-size:0.75em; cursor:pointer; font-family:inherit;
+          padding:5px 11px; border-radius:7px; border:1px solid ${selected ? '#2563a8' : '#e3e8ef'};
+          background:${selected ? 'rgba(37,99,168,0.1)' : '#f6f8fb'};
+          color:${selected ? '#1f3a5f' : '#5a6573'}; font-size:0.75em; font-weight:600; cursor:pointer; font-family:inherit;
         ">${label} (${dateLabel})</button>`;
       }).join('');
 
@@ -1757,7 +1199,7 @@
       const summaryEl = document.getElementById('comparison-summary');
 
       if (!curves || Object.keys(curves).length === 0) {
-        summaryEl.innerHTML = '<span style="color:#52525b">Sin datos de snapshots aun</span>';
+        summaryEl.innerHTML = '<span style="color:var(--ink-3)">Sin datos de snapshots aún</span>';
         return;
       }
 
@@ -1830,8 +1272,8 @@
         {
           label: 'Esta semana',
           data: currentTrimmed,
-          borderColor: '#4ade80',
-          backgroundColor: 'rgba(74,222,128,0.1)',
+          borderColor: '#1f3a5f',
+          backgroundColor: 'rgba(31,58,95,0.08)',
           borderWidth: 2,
           fill: true,
           tension: 0.3,
@@ -1841,7 +1283,7 @@
         {
           label: 'Ritmo ideal',
           data: idealData,
-          borderColor: 'rgba(167,139,250,0.3)',
+          borderColor: 'rgba(100,116,139,0.5)',
           borderDash: [8, 4],
           borderWidth: 1.5,
           fill: false,
@@ -1857,7 +1299,7 @@
         datasets.splice(1, 0, {
           label: prevLabel,
           data: prevData,
-          borderColor: '#52525b',
+          borderColor: '#94a3b8',
           borderDash: [6, 3],
           borderWidth: 1.5,
           fill: false,
@@ -1880,7 +1322,7 @@
               position: 'top',
               align: 'end',
               labels: {
-                color: '#71717a',
+                color: '#6b7280',
                 font: { size: 11 },
                 boxWidth: 12,
                 padding: 12
@@ -1895,7 +1337,7 @@
           scales: {
             x: {
               ticks: {
-                color: '#52525b',
+                color: '#94a3b8',
                 font: { size: 10 },
                 maxRotation: 0,
                 callback: function(val, idx) {
@@ -1904,7 +1346,7 @@
               },
               grid: {
                 color: function(ctx) {
-                  return ctx.index % 24 === 0 ? 'rgba(255,255,255,0.1)' : 'transparent';
+                  return ctx.index % 24 === 0 ? 'rgba(20,30,48,0.1)' : 'transparent';
                 },
                 lineWidth: function(ctx) {
                   return ctx.index % 24 === 0 ? 1 : 0;
@@ -1916,11 +1358,11 @@
               min: 0,
               max: 100,
               ticks: {
-                color: '#52525b',
+                color: '#94a3b8',
                 font: { size: 11 },
                 callback: v => v + '%'
               },
-              grid: { display: false }
+              grid: { color: 'rgba(20,30,48,0.06)' }
             }
           }
         }
@@ -1934,13 +1376,13 @@
         if (prevData && prevAtSamePoint > 0) {
           const diff = currentNow - prevAtSamePoint;
           const sign = diff >= 0 ? '+' : '';
-          const color = diff >= 0 ? '#f97316' : '#4ade80';
+          const color = diff >= 0 ? '#ea580c' : '#15803d';
           summaryEl.innerHTML = `A las <strong>${elapsedHours}h</strong>: ` +
             `<strong>${currentNow.toFixed(1)}%</strong> esta semana vs ` +
             `<strong>${prevAtSamePoint.toFixed(1)}%</strong> anterior ` +
             `(<span style="color:${color}">${sign}${diff.toFixed(1)} pp</span>)`;
         } else if (!prevData) {
-          summaryEl.innerHTML = `<span style="color:#71717a">Primera semana registrada — la comparacion estara disponible desde el proximo ciclo</span>`;
+          summaryEl.innerHTML = `<span style="color:var(--ink-3)">Primera semana registrada — la comparación estará disponible desde el próximo ciclo</span>`;
         } else {
           summaryEl.innerHTML = `A las <strong>${elapsedHours}h</strong>: <strong>${currentNow.toFixed(1)}%</strong> usado`;
         }
@@ -1961,11 +1403,11 @@
           renderComparison(data.curves, data.currentWeekId);
         });
       } catch (e) {
-        console.error('Error loading patterns tab:', e);
+        console.error('Error loading comparison chart:', e);
       }
     }
 
-    // === Consumo Tab (delta %) ===
+    // === Consumption deltas (Overview) ===
     let deltaDailyChart = null;
     let deltaHourlyChart = null;
 
@@ -1974,60 +1416,21 @@
       const sub = document.getElementById('consumo-rate-sub');
 
       if (!rate || rate.perHour === 0) {
-        el.textContent = '--';
-        el.className = 'consumo-card-value cyan';
+        el.textContent = '—';
+        el.className = 'kpi-value';
         sub.textContent = 'Sin datos recientes';
         return;
       }
 
       el.textContent = rate.perHour.toFixed(1) + '%';
-      sub.textContent = `${rate.perDay.toFixed(1)}%/dia est. (${rate.hoursUsed}h con datos)`;
+      sub.textContent = `${rate.perDay.toFixed(1)}%/día est. · ${rate.hoursUsed}h con datos`;
 
       if (rate.perHour <= 1) {
-        el.className = 'consumo-card-value green';
+        el.className = 'kpi-value green';
       } else if (rate.perHour <= 2) {
-        el.className = 'consumo-card-value yellow';
+        el.className = 'kpi-value yellow';
       } else {
-        el.className = 'consumo-card-value red';
-      }
-    }
-
-    function updateProjectionCard(projection) {
-      const el = document.getElementById('consumo-projection');
-      const sub = document.getElementById('consumo-projection-sub');
-
-      if (!projection || projection.hoursLeft == null) {
-        el.textContent = '--';
-        el.className = 'consumo-card-value purple';
-        sub.textContent = 'Sin datos suficientes';
-        return;
-      }
-
-      if (projection.hoursLeft === 0) {
-        el.textContent = 'Agotado';
-        el.className = 'consumo-card-value red';
-        sub.textContent = `${projection.currentPercent}% usado`;
-        return;
-      }
-
-      if (projection.hoursLeft >= 24) {
-        el.textContent = projection.daysLeft.toFixed(1) + 'd';
-      } else {
-        el.textContent = projection.hoursLeft.toFixed(0) + 'h';
-      }
-
-      const exhaustDate = new Date(projection.date);
-      const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-      const h = exhaustDate.getHours();
-      const hLabel = h > 12 ? (h - 12) + 'pm' : h === 0 ? '12am' : h === 12 ? '12pm' : h + 'am';
-      sub.textContent = `~${exhaustDate.getDate()} ${months[exhaustDate.getMonth()]} ${hLabel} | ${projection.currentPercent}% usado`;
-
-      if (projection.hoursLeft < 12) {
-        el.className = 'consumo-card-value red';
-      } else if (projection.hoursLeft < 36) {
-        el.className = 'consumo-card-value yellow';
-      } else {
-        el.className = 'consumo-card-value green';
+        el.className = 'kpi-value red';
       }
     }
 
@@ -2051,8 +1454,8 @@
           datasets: [{
             label: 'Delta %',
             data,
-            backgroundColor: data.map(v => v > 15 ? 'rgba(248,113,113,0.7)' : v > 10 ? 'rgba(251,191,36,0.7)' : 'rgba(34,211,238,0.6)'),
-            borderColor: data.map(v => v > 15 ? '#f87171' : v > 10 ? '#fbbf24' : '#22d3ee'),
+            backgroundColor: data.map(v => v > 15 ? 'rgba(220,38,38,0.78)' : v > 10 ? 'rgba(217,119,6,0.8)' : 'rgba(37,99,168,0.72)'),
+            borderColor: data.map(v => v > 15 ? '#dc2626' : v > 10 ? '#d97706' : '#2563a8'),
             borderWidth: 1,
             borderRadius: 4
           }]
@@ -2072,11 +1475,11 @@
             y: {
               min: 0,
               max: maxY,
-              ticks: { color: '#52525b', font: { size: 11 }, callback: v => v + '%' },
-              grid: { color: 'rgba(255,255,255,0.05)' }
+              ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => v + '%' },
+              grid: { color: 'rgba(20,30,48,0.06)' }
             },
             x: {
-              ticks: { color: '#52525b', font: { size: 11 } },
+              ticks: { color: '#94a3b8', font: { size: 11 } },
               grid: { display: false }
             }
           }
@@ -2104,8 +1507,8 @@
           datasets: [{
             label: 'Delta %',
             data,
-            backgroundColor: 'rgba(34,211,238,0.6)',
-            borderColor: '#22d3ee',
+            backgroundColor: 'rgba(37,99,168,0.72)',
+            borderColor: '#2563a8',
             borderWidth: 1,
             borderRadius: 3
           }]
@@ -2125,12 +1528,12 @@
             y: {
               min: 0,
               max: maxY,
-              ticks: { color: '#52525b', font: { size: 11 }, callback: v => v + '%' },
-              grid: { color: 'rgba(255,255,255,0.05)' }
+              ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => v + '%' },
+              grid: { color: 'rgba(20,30,48,0.06)' }
             },
             x: {
               ticks: {
-                color: '#52525b',
+                color: '#94a3b8',
                 font: { size: 9 },
                 maxRotation: 45,
                 callback: function(val, idx) {
@@ -2149,12 +1552,12 @@
       const weeksInfo = document.getElementById('heatmap-weeks-info');
 
       if (!heatmap) {
-        grid.innerHTML = '<div style="text-align:center; padding:20px; color:#52525b; grid-column:1/-1;">Sin datos de heatmap</div>';
+        grid.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink-3); grid-column:1/-1;">Sin datos de heatmap</div>';
         return;
       }
 
       if (weeksInfo && heatmapWeeks) {
-        weeksInfo.textContent = `(promedio de ${heatmapWeeks} semana${heatmapWeeks > 1 ? 's' : ''})`;
+        weeksInfo.textContent = `promedio de ${heatmapWeeks} semana${heatmapWeeks > 1 ? 's' : ''}`;
       }
 
       const maxVal = Math.max(...heatmap.flat(), 0.1);
@@ -2178,11 +1581,11 @@
           const val = heatmap[dow][h];
           let bg;
           if (val === 0) {
-            bg = 'rgba(255,255,255,0.04)';
+            bg = 'rgba(20,30,48,0.05)';
           } else {
             const intensity = Math.min(val / maxVal, 1);
             const alpha = 0.15 + intensity * 0.85;
-            bg = `rgba(34,211,238,${alpha})`;
+            bg = `rgba(31,58,95,${alpha})`;
           }
           const tip = `data-tip="${label} ${String(h).padStart(2, '0')}h: ${val.toFixed(2)}%"`;
           html += `<div class="heatmap-cell" style="background:${bg}" ${tip}></div>`;
@@ -2204,7 +1607,6 @@
         }
 
         updateRateCard(data.currentRate);
-        updateProjectionCard(data.projection);
 
         const tabVisible = document.getElementById('tab-overview').classList.contains('active');
         if (tabVisible) {
@@ -2217,7 +1619,7 @@
 
         const meta = data.meta;
         document.getElementById('consumo-meta').textContent =
-          `Snapshots: ${meta.valid}/${meta.total} validos (${meta.filtered} filtrados) | ${meta.rawDeltas} deltas`;
+          `Snapshots: ${meta.valid}/${meta.total} válidos · ${meta.filtered} filtrados · ${meta.rawDeltas} deltas`;
       } catch (e) {
         console.error('Error loading consumo tab:', e);
         document.getElementById('consumo-meta').textContent = 'Error cargando datos de consumo';
