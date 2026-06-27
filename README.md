@@ -1,5 +1,8 @@
 # ccfuel
 
+[![CI](https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml/badge.svg)](https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 **Fuel gauge for Claude Code.** Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
 
 > Stop guessing. Know exactly how much Claude Code fuel you have left.
