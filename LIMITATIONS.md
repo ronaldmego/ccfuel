@@ -28,7 +28,18 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 
 - 5-minute cache on successful fetches (avoids hammering PTY)
 - 35-second timeout with graceful fallback
+- **A failed/timed-out fetch keeps the last good cached value** — a transient PTY timeout never overwrites real usage with `0%` (see Historical bug below)
 - Debug mode: `node claude-usage.js --debug` writes raw output to `/tmp/claude-usage-debug.log`
+
+### Historical bug: transient PTY timeout read as 0% (#34)
+
+**Symptom:** the dashboard intermittently showed `0% used` / `100% remaining` / `Reset unavailable` even though Claude's `/usage` reported real consumption.
+
+**Cause:** a timed-out PTY fetch returns `success: false` with `0%`. In `fetchAndSnapshot()` (`server.js`), `globalUsageCache.data` was assigned **before** the `success` check, so a failed fetch overwrote the last good value with `0%`. Logs showed alternating `✅ Global usage updated: 37% week` / `✅ Global usage updated: 0% week`. The PTY parser itself was fine (`node claude-usage.js --debug` returned correct values), confirming the bug was in the caching layer, not the parser.
+
+**Fix:** on `!usage.success`, keep the last good cached value and skip the snapshot, so transient failures can never surface as `0%` ([#34](https://github.com/ronaldmego/ccfuel/issues/34)).
+
+> **For future reference:** if `0%`/`Reset unavailable` ever reappears, first run `node claude-usage.js --debug` — if it returns correct values, the parser is fine and the issue is in the server caching/refresh path, not the data engine.
 
 ---
 

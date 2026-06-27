@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- Dashboard intermittently showed `0% used` / `100% remaining` when usage existed: a timed-out `/usage` fetch (`success: false`, `0%`) was cached over the last good value. Failed fetches now keep the last good value and skip snapshots ([#34](https://github.com/ronaldmego/ccfuel/issues/34))
+
 ### Changed
 - **Public OSS prep** — renamed to **ccfuel**, translated the UI to English, added an own fuel-gauge logo (trademark-safe), sanitized internal references, and added CONTRIBUTING / SECURITY / issue & PR templates and a minimal CI ([#32](https://github.com/ronaldmego/ccfuel/issues/32))
 
