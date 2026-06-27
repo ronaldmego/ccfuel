@@ -1,7 +1,11 @@
-# ccfuel
+<p align="center">
+  <img src="./assets/ccfuel-logo.svg" alt="ccfuel — Fuel gauge for Claude Code" width="440">
+</p>
 
-[![CI](https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml/badge.svg)](https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml"><img src="https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
+</p>
 
 **Fuel gauge for Claude Code.** Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
 
