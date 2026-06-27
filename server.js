@@ -623,13 +623,19 @@ app.get('/api/weekly-history', (req, res) => {
 // PTY spawns (set it before calling, clear it in a finally block).
 async function fetchAndSnapshot() {
   const usage = await getClaudeUsage(false);
+
+  // A timed-out / unparseable fetch comes back as success:false with 0% — never
+  // let that overwrite a good cached value (it would make the dashboard read 0%
+  // / "100% remaining" until the next good fetch). Keep the last good value.
+  if (!usage.success) {
+    console.warn('⚠️  /usage fetch returned no parseable data:', usage.errorMessage || 'unknown reason',
+      '— keeping last good value');
+    return globalUsageCache.data || usage;
+  }
+
   updatePersistedResets(usage);
   globalUsageCache.data = usage;
   globalUsageCache.lastUpdate = new Date().toISOString();
-
-  if (!usage.success) {
-    console.warn('⚠️  /usage fetch returned no parseable data:', usage.errorMessage || 'unknown reason');
-  }
 
   console.log('✅ Global usage updated:', usage.weekAll?.percent + '% week',
     usage.weekAll?.resetsAt ? '(resetsAt: ' + usage.weekAll.resetsAt + ')' : '(resetsAt: persisted)');
