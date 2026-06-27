@@ -30,14 +30,11 @@ See `TECHNICAL-NOTES.md` for the full methodology.
 
 ## Screenshots
 
-![Dashboard Overview](./screenshots/dashboard-overview.png)
-*Main dashboard showing real token consumption, weekly pace, and daily patterns*
+![Overview](./screenshots/dashboard-overview.png)
+*Overview — official usage, session/weekly quota gauges, burn rate, and daily/hourly consumption with an activity heatmap*
 
-![Usage Patterns](./screenshots/usage-patterns.png)  
-*Activity heatmap and weekly comparison charts*
-
-![Efficiency Tracking](./screenshots/efficiency-tracking.png)
-*Billing cycle progress and weekly efficiency history*
+![Weekly](./screenshots/weekly-tab.png)
+*Weekly — cycle progress, cumulative curves per week, and weekly history*
 
 ## Stack
 
