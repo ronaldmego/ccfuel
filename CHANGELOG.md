@@ -95,11 +95,11 @@
 
 ### Fix: Dashboard no cargaba via Tailscale
 
-**Problema:** `http://100.64.216.28:3400/` no respondía. El servidor estaba bindeado a `127.0.0.1` y rechazaba conexiones desde la IP de Tailscale.
+**Problema:** `http://<TAILSCALE_IP>:3400/` no respondía. El servidor estaba bindeado a `127.0.0.1` y rechazaba conexiones desde la IP de Tailscale.
 
 **Fix:**
-- Creado `ecosystem.config.cjs` con `DASHBOARD_HOST=100.64.216.28` para que PM2 pase la variable de entorno correctamente
-- Reiniciado PM2 con la nueva config — servidor ahora escucha en `100.64.216.28:3400`
+- Creado `ecosystem.config.cjs` con `DASHBOARD_HOST=<TAILSCALE_IP>` para que PM2 pase la variable de entorno correctamente
+- Reiniciado PM2 con la nueva config — servidor ahora escucha en `<TAILSCALE_IP>:3400`
 - `pm2 save` ejecutado para persistir la configuración
 
 ## 2026-03-01
@@ -120,7 +120,7 @@
 **⚠️ ADVERTENCIA:** `claude-usage.js` es la pieza MÁS CRÍTICA del dashboard. Sin ella, nada funciona — el UI es solo presentación. NO tocar este archivo sin testing exhaustivo. Cualquier cambio en Claude Code CLI (autocomplete timing, output format, env vars) puede romperlo.
 
 **También resuelto:**
-- Dashboard bindeado a `100.64.216.28` (Tailscale) para acceso remoto
+- Dashboard bindeado a `<TAILSCALE_IP>` (Tailscale) para acceso remoto
 - Cerrado issue #18 (bug report) via PR #19
 
 **Issue:** https://github.com/ronaldmego/claude-code-usage-dashboard/issues/18
