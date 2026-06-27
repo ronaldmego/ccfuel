@@ -1,1 +1,1 @@
-Screenshots will be added when browser automation is available.
+Screenshots used in the main README, captured from a real session (light/executive theme).

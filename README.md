@@ -1,6 +1,9 @@
-# Claude Code Usage Dashboard
+# ccfuel
 
-Real fuel monitoring for Claude Code. Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
+[![CI](https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml/badge.svg)](https://github.com/ronaldmego/ccfuel/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+**Fuel gauge for Claude Code.** Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
 
 > Stop guessing. Know exactly how much Claude Code fuel you have left.
 
@@ -30,14 +33,11 @@ See `TECHNICAL-NOTES.md` for the full methodology.
 
 ## Screenshots
 
-![Dashboard Overview](./screenshots/dashboard-overview.png)
-*Main dashboard showing real token consumption, weekly pace, and daily patterns*
+![Overview](./screenshots/dashboard-overview.png)
+*Overview — official usage, session/weekly quota gauges, burn rate, and daily/hourly consumption with an activity heatmap*
 
-![Usage Patterns](./screenshots/usage-patterns.png)  
-*Activity heatmap and weekly comparison charts*
-
-![Efficiency Tracking](./screenshots/efficiency-tracking.png)
-*Billing cycle progress and weekly efficiency history*
+![Weekly](./screenshots/weekly-tab.png)
+*Weekly — cycle progress, cumulative curves per week, and weekly history*
 
 ## Stack
 
@@ -66,8 +66,8 @@ Works on any machine where Claude Code is installed. Reads `~/.claude/` logs aut
 
 ```bash
 # Clone
-git clone https://github.com/ronaldmego/claude-code-usage-dashboard.git
-cd claude-code-usage-dashboard
+git clone https://github.com/ronaldmego/ccfuel.git
+cd ccfuel
 
 # Install
 npm install
@@ -81,7 +81,8 @@ Open `http://localhost:3400` in your browser. That's it — the dashboard reads 
 ### Optional: PM2 for background running
 
 ```bash
-pm2 start server.js --name claude-usage-dashboard
+cp ecosystem.config.example.cjs ecosystem.config.cjs
+pm2 start ecosystem.config.cjs
 ```
 
 ### Optional: Custom configuration
@@ -113,15 +114,14 @@ Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──> 
 ### File Structure
 
 ```
-claude-code-usage-dashboard/
+ccfuel/
 ├── server.js           # Express server + PTY integration
 ├── claude-usage.js     # PTY wrapper for Claude /usage
 ├── public/
 │   └── index.html      # Dashboard (all inline: HTML, CSS, JS)
-├── data/
+├── data/               # Local snapshots (gitignored, created at runtime)
 │   ├── weekly-history.json  # Weekly efficiency snapshots
 │   └── usage-curve.json     # Periodic % snapshots (~every 10 min)
-├── CLAUDE.md           # Agent operating guide
 ├── TECHNICAL-NOTES.md  # Measurement methodology
 ├── LIMITATIONS.md      # Known limitations
 └── package.json
@@ -190,7 +190,6 @@ node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s
 
 | File | Contents |
 |------|----------|
-| `CLAUDE.md` | Agent operating guide (commands, conventions, constraints) |
 | `TECHNICAL-NOTES.md` | Measurement methodology: real fuel vs cache reads |
 | `LIMITATIONS.md` | Known limitations (PTY dependency, timezone) |
 | `CHANGELOG.md` | Version history |

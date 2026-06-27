@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Usage · Monitor de consumo</title>
+  <title>Claude Usage · Consumption monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -316,7 +316,7 @@
       </div>
       <div class="brand-text">
         <span class="brand-name">Claude Usage</span>
-        <span class="brand-sub">Monitor de consumo</span>
+        <span class="brand-sub">Consumption monitor</span>
       </div>
     </div>
     <div class="header-right">
@@ -328,7 +328,7 @@
           <line x1="16" y1="2" x2="16" y2="6"></line>
         </svg>
         <select id="cycle-select">
-          <option value="current">Ciclo actual</option>
+          <option value="current">Current cycle</option>
         </select>
         <span id="cycle-range">—</span>
       </div>
@@ -337,19 +337,19 @@
           <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
           <path d="M21 3v6h-6"></path>
         </svg>
-        <span>Actualizar</span>
+        <span>Refresh</span>
       </button>
     </div>
   </header>
 
   <!-- Main Content -->
   <main class="main">
-    <div class="overline">Fuente oficial · Claude /usage · zona horaria UTC−5</div>
+    <div class="overline">Official source · Claude /usage · timezone UTC−5</div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab active" data-tab="overview"><span>Resumen</span></button>
-      <button class="tab" data-tab="semana"><span>Semanal</span></button>
+      <button class="tab active" data-tab="overview"><span>Overview</span></button>
+      <button class="tab" data-tab="semana"><span>Weekly</span></button>
     </div>
 
     <!-- Tab: Overview -->
@@ -357,8 +357,8 @@
       <!-- Official usage -->
       <div class="global-usage-card" id="global-usage-section">
         <div class="global-usage-header">
-          <span class="global-usage-title">Consumo oficial<small>reportado por Claude /usage</small></span>
-          <button class="icon-btn" onclick="refreshGlobalUsage()" id="global-refresh-btn" title="Refrescar consumo oficial">
+          <span class="global-usage-title">Official usage<small>reported by Claude /usage</small></span>
+          <button class="icon-btn" onclick="refreshGlobalUsage()" id="global-refresh-btn" title="Refresh official usage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path>
             </svg>
@@ -366,57 +366,57 @@
         </div>
         <div class="global-usage-grid">
           <div class="global-usage-item">
-            <div class="global-usage-label">Sesión</div>
+            <div class="global-usage-label">Session</div>
             <div class="global-usage-bar"><div class="global-usage-fill" id="global-session-bar" style="width: 0%"></div></div>
             <div class="global-usage-value" id="global-session">—%</div>
             <div class="global-usage-reset" id="global-session-reset"></div>
           </div>
           <div class="global-usage-item">
-            <div class="global-usage-label">Semanal · Todos</div>
+            <div class="global-usage-label">Weekly · All</div>
             <div class="global-usage-bar"><div class="global-usage-fill" id="global-week-bar" style="width: 0%"></div></div>
             <div class="global-usage-value" id="global-week">—%</div>
             <div class="global-usage-reset" id="global-week-reset"></div>
           </div>
           <div class="global-usage-item">
-            <div class="global-usage-label">Semanal · Sonnet</div>
+            <div class="global-usage-label">Weekly · Sonnet</div>
             <div class="global-usage-bar"><div class="global-usage-fill sonnet" id="global-sonnet-bar" style="width: 0%"></div></div>
             <div class="global-usage-value" id="global-sonnet">—%</div>
             <div class="global-usage-reset" id="global-sonnet-reset"></div>
           </div>
           <div class="global-usage-item extra" id="global-extra-container" style="display:none;">
-            <div class="global-usage-label">Uso adicional</div>
+            <div class="global-usage-label">Extra usage</div>
             <div class="global-usage-value" id="global-extra">—</div>
           </div>
         </div>
         <div class="global-usage-footer" id="global-usage-footer">
-          <span id="global-usage-status">Cargando…</span>
+          <span id="global-usage-status">Loading…</span>
         </div>
       </div>
 
       <!-- Quota gauges -->
       <div class="gauges-row">
         <div class="gauge-card">
-          <div class="gauge-title">Cuota de sesión</div>
+          <div class="gauge-title">Session quota</div>
           <svg viewBox="0 0 200 115" class="gauge-svg">
             <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"/>
             <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"
               id="session-gauge-arc" stroke-dasharray="0 251"/>
             <text x="100" y="78" text-anchor="middle" fill="#16202e" font-size="28" font-weight="600" font-family="'IBM Plex Mono', monospace" id="session-gauge-val">—</text>
-            <text x="100" y="96" text-anchor="middle" fill="#8b95a3" font-size="11" font-family="'IBM Plex Sans', sans-serif" id="session-gauge-label">restante</text>
+            <text x="100" y="96" text-anchor="middle" fill="#8b95a3" font-size="11" font-family="'IBM Plex Sans', sans-serif" id="session-gauge-label">remaining</text>
           </svg>
-          <div class="gauge-info" id="session-gauge-info">Cargando…</div>
+          <div class="gauge-info" id="session-gauge-info">Loading…</div>
         </div>
 
         <div class="gauge-card">
-          <div class="gauge-title">Cuota semanal</div>
+          <div class="gauge-title">Weekly quota</div>
           <svg viewBox="0 0 200 115" class="gauge-svg">
             <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"/>
             <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e7ebf1" stroke-width="14" stroke-linecap="round"
               id="week-gauge-arc" stroke-dasharray="0 251"/>
             <text x="100" y="78" text-anchor="middle" fill="#16202e" font-size="28" font-weight="600" font-family="'IBM Plex Mono', monospace" id="week-gauge-val">—</text>
-            <text x="100" y="96" text-anchor="middle" fill="#8b95a3" font-size="11" font-family="'IBM Plex Sans', sans-serif" id="week-gauge-label">restante</text>
+            <text x="100" y="96" text-anchor="middle" fill="#8b95a3" font-size="11" font-family="'IBM Plex Sans', sans-serif" id="week-gauge-label">remaining</text>
           </svg>
-          <div class="gauge-info" id="week-gauge-info">Cargando…</div>
+          <div class="gauge-info" id="week-gauge-info">Loading…</div>
           <div class="gauge-detail" id="week-gauge-detail"></div>
         </div>
       </div>
@@ -424,9 +424,9 @@
       <!-- Cumulative consumption vs previous weeks -->
       <div class="pattern-card">
         <div class="section-head">
-          <span class="section-title">Consumo acumulado</span>
+          <span class="section-title">Cumulative usage</span>
         </div>
-        <div class="section-sub">% acumulado por hora del ciclo · fuente Claude /usage</div>
+        <div class="section-sub">% cumulative per cycle hour · source Claude /usage</div>
         <div id="comparison-week-selector" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
         <div id="comparison-container">
           <div class="comparison-wrapper"><canvas id="comparisonChart"></canvas></div>
@@ -437,10 +437,10 @@
       <!-- Current rate (measured, real data) -->
       <div class="kpi-row">
         <div class="kpi-card">
-          <span class="kpi-label">Ritmo de consumo</span>
+          <span class="kpi-label">Burn rate</span>
           <div class="kpi-right">
             <div class="kpi-value" id="consumo-rate">—</div>
-            <div class="kpi-sub" id="consumo-rate-sub">%/hora</div>
+            <div class="kpi-sub" id="consumo-rate-sub">%/hour</div>
           </div>
         </div>
       </div>
@@ -448,7 +448,7 @@
       <div class="charts-grid">
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">Consumo diario</span>
+            <span class="chart-title">Daily consumption</span>
             <div class="legend-pills">
               <span><span class="legend-dot" style="background:#2563a8"></span> ≤10%</span>
               <span><span class="legend-dot" style="background:#d97706"></span> &gt;10%</span>
@@ -456,12 +456,12 @@
             </div>
           </div>
           <div class="chart-wrapper"><canvas id="deltaDailyChart"></canvas></div>
-          <div class="chart-note">Cambio porcentual por día, derivado de snapshots de /usage cada ~10 min.</div>
+          <div class="chart-note">Per-day % change, derived from /usage snapshots every ~10 min.</div>
         </div>
 
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">Consumo por hora · 48h</span>
+            <span class="chart-title">Hourly consumption · 48h</span>
           </div>
           <div class="chart-wrapper"><canvas id="deltaHourlyChart"></canvas></div>
         </div>
@@ -469,21 +469,21 @@
 
       <div class="pattern-card">
         <div class="section-head">
-          <span class="section-title">Patrón de actividad</span>
+          <span class="section-title">Activity pattern</span>
           <span class="section-meta" id="heatmap-weeks-info"></span>
         </div>
-        <div class="section-sub">Intensidad promedio por día de la semana y hora — más oscuro = mayor consumo</div>
+        <div class="section-sub">Average intensity by weekday and hour — darker = higher usage</div>
         <div id="delta-heatmap-container">
           <div id="delta-heatmap-grid" class="delta-heatmap-grid"></div>
           <div class="heatmap-legend">
-            <span>Menos</span>
+            <span>Less</span>
             <div class="delta-heatmap-legend-gradient"></div>
-            <span>Más</span>
+            <span>More</span>
           </div>
         </div>
       </div>
 
-      <div class="section-meta" id="consumo-meta" style="text-align:center; padding:8px;">Cargando datos de consumo…</div>
+      <div class="section-meta" id="consumo-meta" style="text-align:center; padding:8px;">Loading consumption data…</div>
     </div>
 
     <!-- Tab: Semana -->
@@ -491,18 +491,18 @@
       <!-- Current Week -->
       <div class="eff-card">
         <div class="section-head">
-          <span class="section-title">Esta semana</span>
+          <span class="section-title">This week</span>
           <span class="section-meta" id="eff-day-info">—</span>
         </div>
 
         <div class="eff-main">
           <div class="eff-big">
             <div class="eff-big-number green" id="eff-used-pct">—%</div>
-            <div class="eff-big-label">Consumido</div>
+            <div class="eff-big-label">Consumed</div>
           </div>
           <div class="eff-big">
             <div class="eff-big-number red" id="eff-risk-pct">—%</div>
-            <div class="eff-big-label">En riesgo de expirar</div>
+            <div class="eff-big-label">At risk of expiring</div>
           </div>
         </div>
 
@@ -516,9 +516,9 @@
       <!-- Weekly Cumulative Curves Chart -->
       <div class="eff-card">
         <div class="section-head">
-          <span class="section-title">Curvas semanales</span>
+          <span class="section-title">Weekly curves</span>
         </div>
-        <div class="section-sub">% acumulado por día del ciclo — una línea por semana</div>
+        <div class="section-sub">% cumulative per cycle day — one line per week</div>
         <div style="position:relative; height:420px;">
           <canvas id="weeklyCurvesChart"></canvas>
         </div>
@@ -527,20 +527,20 @@
       <!-- Weekly History -->
       <div class="eff-card">
         <div class="section-head">
-          <span class="section-title">Historial semanal</span>
+          <span class="section-title">Weekly history</span>
         </div>
         <div style="overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top:12px;">
           <table class="eff-history-table">
             <thead>
               <tr>
-                <th>Semana</th>
-                <th>Día</th>
-                <th>% Usado</th>
-                <th>Velocidad</th>
+                <th>Week</th>
+                <th>Day</th>
+                <th>% Used</th>
+                <th>Speed</th>
               </tr>
             </thead>
             <tbody id="eff-history-body">
-              <tr><td colspan="4" style="text-align:center; padding: 16px; color: var(--ink-3);">Cargando…</td></tr>
+              <tr><td colspan="4" style="text-align:center; padding: 16px; color: var(--ink-3);">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -549,7 +549,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-      Última actualización: <span id="last-update">—</span>
+      Last updated: <span id="last-update">—</span>
     </footer>
   </main>
 
@@ -606,7 +606,7 @@
     }
 
     async function refresh() {
-      document.getElementById('global-usage-status').textContent = 'Actualizando…';
+      document.getElementById('global-usage-status').textContent = 'Refreshing…';
       await loadGlobalUsage();
       await loadConsumoTab();
     }
@@ -641,14 +641,14 @@
       const daysRemaining = 7 - elapsedDays;
       const dayNum = Math.min(Math.ceil(elapsedDays), 7);
 
-      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-      const fmt = d => `${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
-      const days = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const fmt = d => `${months[d.getUTCMonth()]} ${d.getUTCDate()}`;
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const fmtReset = d => {
         const dayName = days[d.getUTCDay()];
         const h = d.getUTCHours();
         const hLabel = h > 12 ? (h - 12) + 'pm' : h === 12 ? '12pm' : h === 0 ? '12am' : h + 'am';
-        return `${dayName} ${d.getUTCDate()} ${months[d.getUTCMonth()]} ${hLabel}`;
+        return `${dayName} ${months[d.getUTCMonth()]} ${d.getUTCDate()} ${hLabel}`;
       };
 
       const h = Math.floor(hoursUntilReset);
@@ -729,9 +729,9 @@
       const countdown = formatResetCountdown(session.resetsAt);
       if (countdown) {
         document.getElementById('session-gauge-info').textContent =
-          `Reset ${countdown.timeLabel} (${countdown.h}h ${countdown.m}m) · ${percent}% usado`;
+          `Reset ${countdown.timeLabel} (${countdown.h}h ${countdown.m}m) · ${percent}% used`;
       } else {
-        document.getElementById('session-gauge-info').textContent = percent + '% usado · reset no disponible';
+        document.getElementById('session-gauge-info').textContent = percent + '% used · reset unavailable';
       }
     }
 
@@ -739,7 +739,7 @@
     async function loadGlobalUsage(retries = 3) {
       try {
         const statusEl = document.getElementById('global-usage-status');
-        statusEl.textContent = 'Cargando…';
+        statusEl.textContent = 'Loading…';
         statusEl.style.color = '';
 
         const res = await fetch('/api/global-usage');
@@ -770,7 +770,7 @@
               const label = cd.isMultiDay ? cd.dateLabel : cd.timeLabel;
               el.textContent = `Reset: ${label} (${cd.h}h ${cd.m}m)`;
             } else {
-              el.textContent = 'Reset no disponible';
+              el.textContent = 'Reset unavailable';
             }
           }
 
@@ -784,17 +784,17 @@
           const extraContainer = document.getElementById('global-extra-container');
           if (data.extraUsage.enabled) {
             extraContainer.style.display = '';
-            document.getElementById('global-extra').innerHTML = '<span style="color:#15803d">Activo</span>';
+            document.getElementById('global-extra').innerHTML = '<span style="color:#15803d">Active</span>';
           } else if (data.extraUsage.freeAvailable > 0) {
             extraContainer.style.display = '';
-            document.getElementById('global-extra').innerHTML = `<span style="color:#b45309">$${data.extraUsage.freeAvailable} libre</span>`;
+            document.getElementById('global-extra').innerHTML = `<span style="color:#b45309">$${data.extraUsage.freeAvailable} free</span>`;
           } else {
             extraContainer.style.display = 'none';
           }
 
           const cacheMinutes = data.cacheAge != null ? Math.round(data.cacheAge / 60) : null;
-          const cacheNote = data.cached ? ` · cache ${cacheMinutes != null ? cacheMinutes + 'm' : '✓'}` : ' · en vivo';
-          statusEl.textContent = 'Actualizado: ' + new Date(data.timestamp).toLocaleTimeString('es-PA') + cacheNote;
+          const cacheNote = data.cached ? ` · cache ${cacheMinutes != null ? cacheMinutes + 'm' : '✓'}` : ' · live';
+          statusEl.textContent = 'Updated: ' + new Date(data.timestamp).toLocaleTimeString('en-US') + cacheNote;
 
           if (data.weekAll.resetsAt != null) {
             weeklyResetsAt = data.weekAll.resetsAt;
@@ -812,13 +812,13 @@
           // Bug fix: if weekly limit reached, session gauge should show 0% remaining
           if (data.weekAll.percent >= 100) {
             updateGauge('session-gauge-arc', 'session-gauge-val', 'session-gauge-label', 0);
-            document.getElementById('session-gauge-info').textContent = 'Límite semanal alcanzado (100%)';
+            document.getElementById('session-gauge-info').textContent = 'Weekly limit reached (100%)';
           }
 
           const weekRemaining = 100 - data.weekAll.percent;
           updateGauge('week-gauge-arc', 'week-gauge-val', 'week-gauge-label', weekRemaining);
           document.getElementById('week-gauge-info').textContent =
-            `Día ${cycle.dayNum}/7 · ${data.weekAll.percent}% usado`;
+            `Day ${cycle.dayNum}/7 · ${data.weekAll.percent}% used`;
           document.getElementById('week-gauge-detail').textContent =
             `${cycle.fmtStart} → ${cycle.fmtEnd} · Reset: ${cycle.resetDateLabel} (${cycle.resetIn})`;
 
@@ -829,7 +829,7 @@
           // "first array entry" (which goes stale when snapshots are missing).
           loadWeeklyHistory();
 
-          document.getElementById('last-update').textContent = new Date().toLocaleString('es-PA');
+          document.getElementById('last-update').textContent = new Date().toLocaleString('en-US');
         } else {
           document.getElementById('global-usage-status').textContent = 'Error: ' + (data.error || 'Unknown');
         }
@@ -839,7 +839,7 @@
           await new Promise(r => setTimeout(r, 2000));
           return loadGlobalUsage(retries - 1);
         }
-        document.getElementById('global-usage-status').textContent = 'Error de conexión — refresca la página';
+        document.getElementById('global-usage-status').textContent = 'Connection error — refresh the page';
       }
     }
 
@@ -875,14 +875,14 @@
       document.getElementById('eff-bar-risk').style.width = riskPercent + '%';
 
       document.getElementById('eff-day-info').textContent =
-        `Día ${cycle.dayNum}/7 · ${cycle.fmtStart} → ${cycle.fmtEnd} · Reset: ${cycle.resetDateLabel}`;
+        `Day ${cycle.dayNum}/7 · ${cycle.fmtStart} → ${cycle.fmtEnd} · Reset: ${cycle.resetDateLabel}`;
 
       // Speed info
       const speedEl = document.getElementById('eff-speed-info');
       if (weekPercent >= 100) {
-        speedEl.innerHTML = `<span style="color:#dc2626; font-weight:600;">100% en ${cycle.dayNum} días</span> — límite alcanzado antes del reset`;
+        speedEl.innerHTML = `<span style="color:#dc2626; font-weight:600;">100% in ${cycle.dayNum} days</span> — limit reached before reset`;
       } else {
-        speedEl.innerHTML = `<span style="color:#2563a8;">${weekPercent}% en ${cycle.dayNum} días</span>`;
+        speedEl.innerHTML = `<span style="color:#2563a8;">${weekPercent}% in ${cycle.dayNum} days</span>`;
       }
     }
 
@@ -893,7 +893,7 @@
         const tbody = document.getElementById('eff-history-body');
 
         if (!data.history || data.history.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:var(--ink-3);">Sin historial aún (se registra automáticamente)</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:var(--ink-3);">No history yet (recorded automatically)</td></tr>';
           return;
         }
 
@@ -922,7 +922,7 @@
 
           let endLabel, gapBadge = '';
           if (isCurrent) {
-            endLabel = 'hoy <span style="font-size:0.78em;color:#2563a8;font-weight:600">actual</span>';
+            endLabel = 'today <span style="font-size:0.78em;color:#2563a8;font-weight:600">current</span>';
           } else if (nextEntry) {
             const nextStart = new Date(nextEntry.weekId + 'T00:00:00Z');
             endLabel = fmtMMDD(nextStart);
@@ -931,13 +931,13 @@
             const spanDays = Math.round((nextStart - startDate) / 86400000);
             if (spanDays > 9) {
               const gapDays = spanDays - 7;
-              gapBadge = ` <span style="font-size:0.78em;color:#b45309" title="~${gapDays}d sin snapshots entre ciclos">⚠ hueco ${gapDays}d</span>`;
+              gapBadge = ` <span style="font-size:0.78em;color:#b45309" title="~${gapDays}d without snapshots between cycles">⚠ gap ${gapDays}d</span>`;
             }
           } else {
-            // Top row but not the current cycle → ciclo cerrado sin snapshot nuevo
+            // Top row but not the current cycle → closed cycle with no new snapshot
             const fallbackEnd = new Date(startDate);
             fallbackEnd.setUTCDate(fallbackEnd.getUTCDate() + 7);
-            endLabel = fmtMMDD(fallbackEnd) + ' <span style="font-size:0.78em;color:var(--ink-3)">(ciclo cerrado)</span>';
+            endLabel = fmtMMDD(fallbackEnd) + ' <span style="font-size:0.78em;color:var(--ink-3)">(cycle closed)</span>';
           }
           const weekLabel = startStr + ' → ' + endLabel + gapBadge;
 
@@ -954,12 +954,12 @@
 
             const offColor = w.offlineHours >= 24 ? '#dc2626' : w.offlineHours > 0 ? '#b45309' : '#15803d';
             velocityText = w.offlineHours > 0
-              ? `<span style="color:${offColor}">en ${usedLabel} → ${offLabel} offline</span>`
-              : `<span style="color:#15803d">en ${usedLabel}</span>`;
+              ? `<span style="color:${offColor}">in ${usedLabel} → ${offLabel} offline</span>`
+              : `<span style="color:#15803d">in ${usedLabel}</span>`;
           } else if (pct >= 100) {
-            velocityText = `<span style="color:#15803d">completo</span>`;
+            velocityText = `<span style="color:#15803d">complete</span>`;
           } else {
-            velocityText = `<span style="color:var(--ink-3)">${100 - pct}% libre</span>`;
+            velocityText = `<span style="color:var(--ink-3)">${100 - pct}% free</span>`;
           }
 
           return `<tr${isCurrent ? ' style="background:rgba(31,58,95,0.05)"' : ''}>
@@ -1060,7 +1060,7 @@
         const trimmed = currentData.slice(0, elapsedHours);
 
         datasets.push({
-          label: 'Esta semana',
+          label: 'This week',
           data: trimmed,
           borderColor: '#1f3a5f',
           backgroundColor: 'rgba(31,58,95,0.08)',
@@ -1074,7 +1074,7 @@
 
       // Ideal pace
       datasets.push({
-        label: 'Ritmo ideal',
+        label: 'Ideal pace',
         data: idealData,
         borderColor: 'rgba(100,116,139,0.5)',
         borderDash: [8, 4],
@@ -1175,7 +1175,7 @@
       const recent = weekIds.slice(-4).reverse();
       container.innerHTML = recent.map((wid, idx) => {
         const d = new Date(wid + 'T00:00:00Z');
-        const label = idx === 0 ? 'Anterior' : `Hace ${idx + 1} sem`;
+        const label = idx === 0 ? 'Previous' : `${idx + 1} weeks ago`;
         const dateLabel = (d.getUTCMonth()+1).toString().padStart(2,'0') + '-' + d.getUTCDate().toString().padStart(2,'0');
         const selected = (comparisonSelectedWeekId || recent[0]) === wid;
         return `<button class="comp-week-btn${selected ? ' active' : ''}" data-wid="${wid}" style="
@@ -1199,7 +1199,7 @@
       const summaryEl = document.getElementById('comparison-summary');
 
       if (!curves || Object.keys(curves).length === 0) {
-        summaryEl.innerHTML = '<span style="color:var(--ink-3)">Sin datos de snapshots aún</span>';
+        summaryEl.innerHTML = '<span style="color:var(--ink-3)">No snapshot data yet</span>';
         return;
       }
 
@@ -1270,7 +1270,7 @@
 
       const datasets = [
         {
-          label: 'Esta semana',
+          label: 'This week',
           data: currentTrimmed,
           borderColor: '#1f3a5f',
           backgroundColor: 'rgba(31,58,95,0.08)',
@@ -1281,7 +1281,7 @@
           pointHitRadius: 8
         },
         {
-          label: 'Ritmo ideal',
+          label: 'Ideal pace',
           data: idealData,
           borderColor: 'rgba(100,116,139,0.5)',
           borderDash: [8, 4],
@@ -1295,7 +1295,7 @@
 
       if (prevData) {
         const prevDate = new Date(prevWeekId + 'T00:00:00Z');
-        const prevLabel = 'Sem ' + (prevDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + prevDate.getUTCDate().toString().padStart(2,'0');
+        const prevLabel = 'Wk ' + (prevDate.getUTCMonth()+1).toString().padStart(2,'0') + '-' + prevDate.getUTCDate().toString().padStart(2,'0');
         datasets.splice(1, 0, {
           label: prevLabel,
           data: prevData,
@@ -1377,14 +1377,14 @@
           const diff = currentNow - prevAtSamePoint;
           const sign = diff >= 0 ? '+' : '';
           const color = diff >= 0 ? '#ea580c' : '#15803d';
-          summaryEl.innerHTML = `A las <strong>${elapsedHours}h</strong>: ` +
-            `<strong>${currentNow.toFixed(1)}%</strong> esta semana vs ` +
-            `<strong>${prevAtSamePoint.toFixed(1)}%</strong> anterior ` +
+          summaryEl.innerHTML = `At <strong>${elapsedHours}h</strong>: ` +
+            `<strong>${currentNow.toFixed(1)}%</strong> this week vs ` +
+            `<strong>${prevAtSamePoint.toFixed(1)}%</strong> previous ` +
             `(<span style="color:${color}">${sign}${diff.toFixed(1)} pp</span>)`;
         } else if (!prevData) {
-          summaryEl.innerHTML = `<span style="color:var(--ink-3)">Primera semana registrada — la comparación estará disponible desde el próximo ciclo</span>`;
+          summaryEl.innerHTML = `<span style="color:var(--ink-3)">First week recorded — comparison will be available from the next cycle</span>`;
         } else {
-          summaryEl.innerHTML = `A las <strong>${elapsedHours}h</strong>: <strong>${currentNow.toFixed(1)}%</strong> usado`;
+          summaryEl.innerHTML = `At <strong>${elapsedHours}h</strong>: <strong>${currentNow.toFixed(1)}%</strong> used`;
         }
       } else {
         summaryEl.innerHTML = '';
@@ -1418,12 +1418,12 @@
       if (!rate || rate.perHour === 0) {
         el.textContent = '—';
         el.className = 'kpi-value';
-        sub.textContent = 'Sin datos recientes';
+        sub.textContent = 'No recent data';
         return;
       }
 
       el.textContent = rate.perHour.toFixed(1) + '%';
-      sub.textContent = `${rate.perDay.toFixed(1)}%/día est. · ${rate.hoursUsed}h con datos`;
+      sub.textContent = `${rate.perDay.toFixed(1)}%/day est. · ${rate.hoursUsed}h of data`;
 
       if (rate.perHour <= 1) {
         el.className = 'kpi-value green';
@@ -1552,19 +1552,19 @@
       const weeksInfo = document.getElementById('heatmap-weeks-info');
 
       if (!heatmap) {
-        grid.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink-3); grid-column:1/-1;">Sin datos de heatmap</div>';
+        grid.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink-3); grid-column:1/-1;">No heatmap data</div>';
         return;
       }
 
       if (weeksInfo && heatmapWeeks) {
-        weeksInfo.textContent = `promedio de ${heatmapWeeks} semana${heatmapWeeks > 1 ? 's' : ''}`;
+        weeksInfo.textContent = `avg of ${heatmapWeeks} week${heatmapWeeks > 1 ? 's' : ''}`;
       }
 
       const maxVal = Math.max(...heatmap.flat(), 0.1);
       // Rows are day-of-week: 0=dom, 1=lun, ..., 6=sab
       // Display starting from lun (1) to dom (0)
-      const displayOrder = [1, 2, 3, 4, 5, 6, 0]; // lun, mar, mie, jue, vie, sab, dom
-      const dayLabels = { 0: 'dom', 1: 'lun', 2: 'mar', 3: 'mie', 4: 'jue', 5: 'vie', 6: 'sab' };
+      const displayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+      const dayLabels = { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat' };
 
       let html = '';
 
@@ -1619,10 +1619,10 @@
 
         const meta = data.meta;
         document.getElementById('consumo-meta').textContent =
-          `Snapshots: ${meta.valid}/${meta.total} válidos · ${meta.filtered} filtrados · ${meta.rawDeltas} deltas`;
+          `Snapshots: ${meta.valid}/${meta.total} valid · ${meta.filtered} filtered · ${meta.rawDeltas} deltas`;
       } catch (e) {
-        console.error('Error loading consumo tab:', e);
-        document.getElementById('consumo-meta').textContent = 'Error cargando datos de consumo';
+        console.error('Error loading consumption tab:', e);
+        document.getElementById('consumo-meta').textContent = 'Error loading consumption data';
       }
     }
 

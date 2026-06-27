@@ -3,5 +3,14 @@ data/
 .env
 *.log
 *.png
+# Screenshots ARE published (README hero) — keep them tracked despite *.png above
+!screenshots/*.png
 .pm2/
 .playwright-mcp/
+
+# Internal/agent + deploy files (never in the public repo)
+CLAUDE.md
+ecosystem.config.cjs
+
+# Internal planning notes
+tasks/
