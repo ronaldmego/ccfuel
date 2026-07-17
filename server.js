@@ -633,6 +633,21 @@ async function fetchAndSnapshot() {
     return globalUsageCache.data || usage;
   }
 
+  // Instrumentation: a sustained drop in the weekly % is physically impossible for a
+  // cumulative unless the cycle reset. Within-session data can't tell a real
+  // reset-at-an-unexpected-day from an inflated prior read or a mis-parsed section,
+  // so capture the raw /usage text (incl. both resetsAt anchors) to diagnose the next
+  // occurrence from evidence instead of inference. See the follow-up issue.
+  const prevWeek = globalUsageCache.data?.weekAll;
+  if (prevWeek?.percent != null && usage.weekAll?.percent != null
+      && usage.weekAll.percent < prevWeek.percent - 15) {
+    console.warn(`⚠️  [drop] weekAll ${prevWeek.percent}% → ${usage.weekAll.percent}% `
+      + `| prevReset=${prevWeek.resetsAt} newReset=${usage.weekAll.resetsAt} `
+      + `(same reset ⇒ suspect; changed+later ⇒ real reset). Raw /usage:\n`
+      + (usage.rawClean || '(raw unavailable)'));
+  }
+  delete usage.rawClean; // debug-only — never cache or serve it
+
   updatePersistedResets(usage);
   globalUsageCache.data = usage;
   globalUsageCache.lastUpdate = new Date().toISOString();
