@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- Diagnostic logging for a **sustained** weekly-% drop within a cycle (physically impossible for a cumulative unless the cycle reset): when `weekAll%` falls >15pp below the last good value, the raw `/usage` text and both `resetsAt` anchors are logged, so the residual mid-cycle-cliff mode can be diagnosed from evidence (reset-at-an-unexpected-day vs inflated-prior-read vs mis-parsed section). The raw blob is debug-only — never cached, served, or persisted ([#37](https://github.com/ronaldmego/ccfuel/issues/37))
+
 ### Fixed
 - Cumulative usage chart showed a false mid-cycle valley (the "This week" series crashing to ~0% and re-climbing). Root cause was in the capture layer, not the chart: a `/usage` read starved by parallel `claude -p` sessions comes back without a parseable weekly `% used`, which the parser defaulted to `0`, and the `success` gate (which only required session **or** week `> 0`) let it through — persisting a spurious `weekPercent: 0` mid-cycle. The parser now returns `null` for an unparseable percent (distinct from a real `0%`), `success` requires the weekly % to have parsed, and the snapshot is skipped otherwise; the starved raw read is logged so the residual failure mode (low mis-parsed values / possible non-Monday reset) can be diagnosed from evidence. Anomaly filtering (#28) is unchanged ([#35](https://github.com/ronaldmego/ccfuel/issues/35))
 - Dashboard intermittently showed `0% used` / `100% remaining` when usage existed: a timed-out `/usage` fetch (`success: false`, `0%`) was cached over the last good value. Failed fetches now keep the last good value and skip snapshots ([#34](https://github.com/ronaldmego/ccfuel/issues/34))

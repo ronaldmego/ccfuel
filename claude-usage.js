@@ -201,6 +201,10 @@ function parseUsageOutput(output) {
     // percent is not a usable snapshot (#35). A real 0% still parses (percent === 0).
     success: boundaries.length >= 2 && weekAll.percent != null,
     timestamp: new Date().toISOString(),
+    // Debug-only: the ANSI-stripped raw text, so a suspect read (e.g. a sustained
+    // drop) can be diagnosed from evidence. The caller logs it conditionally and
+    // deletes it before caching/serving — it is never persisted. /usage has no secrets.
+    rawClean: clean.slice(0, 1500),
     session: {
       percent: session.percent ?? 0,   // preserve prior default for the session gauge
       resetsAtHour: session.resetsAtHour,
