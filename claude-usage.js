@@ -128,10 +128,13 @@ function parseUsageOutput(output) {
   }
 
   function parseSection(text) {
-    if (!text) return { percent: 0, resetsAtHour: null, resetsAt: null };
+    // percent is null when the section is absent or has no parseable "N% used" —
+    // this distinguishes a spurious/starved read from a real 0%. Callers decide
+    // how to treat null (weekAll uses it to skip the snapshot; see #35).
+    if (!text) return { percent: null, resetsAtHour: null, resetsAt: null };
 
     const pctMatch = text.match(/(\d+)%\s*used/i);
-    const percent = pctMatch ? parseInt(pctMatch[1]) : 0;
+    const percent = pctMatch ? parseInt(pctMatch[1]) : null;
 
     const rstMatch = text.match(/Res\w*\s+(?:[\w,]*\s+)*?(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
 
@@ -181,24 +184,35 @@ function parseUsageOutput(output) {
   const weekAll = parseSection(sectionTexts.weekAll);
   const weekSonnet = parseSection(sectionTexts.weekSonnet);
 
+  // Instrumentation (#35): when weekAll can't be parsed but the output had section
+  // markers, the read was starved/misaligned (typically a PTY saturated by parallel
+  // `claude -p` sessions). Log the ANSI-stripped text so the failure mode can be
+  // diagnosed from real evidence next time it happens. /usage carries no secrets.
+  if (weekAll.percent == null && boundaries.length > 0) {
+    console.warn('[ccfuel] weekAll %% unparsed (starved/misaligned read); raw /usage (truncated):',
+      clean.slice(0, 800));
+  }
+
   const extraEnabled = /extra usage enabled/i.test(clean) && !/not enabled/i.test(clean);
   const extraMatch = clean.match(/\$(\d+)\s*free/i);
 
   return {
-    success: boundaries.length >= 2 && (session.percent > 0 || weekAll.percent > 0),
+    // Require weekAll to have parsed — a read that couldn't produce the weekly
+    // percent is not a usable snapshot (#35). A real 0% still parses (percent === 0).
+    success: boundaries.length >= 2 && weekAll.percent != null,
     timestamp: new Date().toISOString(),
     session: {
-      percent: session.percent,
+      percent: session.percent ?? 0,   // preserve prior default for the session gauge
       resetsAtHour: session.resetsAtHour,
       resetsAt: session.resetsAt
     },
     weekAll: {
-      percent: weekAll.percent,
+      percent: weekAll.percent,   // null when unparsed — the caller skips the snapshot
       resetsAtHour: weekAll.resetsAtHour,
       resetsAt: weekAll.resetsAt
     },
     weekSonnet: {
-      percent: weekSonnet.percent,
+      percent: weekSonnet.percent ?? 0,
       resetsAtHour: weekSonnet.resetsAtHour,
       resetsAt: weekSonnet.resetsAt
     },
