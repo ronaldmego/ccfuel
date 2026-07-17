@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Fixed
+- Cumulative usage chart showed a false mid-cycle valley (the "This week" series crashing to ~0% around D3 and re-climbing), and burn-rate/activity totals were inflated by the resulting double-count. Within a weekly cycle the cumulative `weekPercent` is monotonic — the weekly quota resets only on its weekly boundary (a new `weekId`), never mid-week (verified against the official Settings → Usage screen) — so sustained spurious `/usage` reads (PTY starved by parallel `claude -p` sessions) that dipped to ~0 were being accepted as a real level shift. `filterAnomalies()` now forward-fills any reading below the week's running peak, superseding the #28 "sustained drop → re-baseline down" policy ([#35](https://github.com/ronaldmego/ccfuel/issues/35))
 - Dashboard intermittently showed `0% used` / `100% remaining` when usage existed: a timed-out `/usage` fetch (`success: false`, `0%`) was cached over the last good value. Failed fetches now keep the last good value and skip snapshots ([#34](https://github.com/ronaldmego/ccfuel/issues/34))
 
 ### Changed

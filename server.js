@@ -175,28 +175,22 @@ function saveUsageCurveSnapshot(usage) {
 
 let usageDeltasCache = { data: null, lastUpdate: null };
 
-const DROP_THRESHOLD = 3;   // % drop within a week treated as anomalous (PTY jitter band)
-const SUSTAIN_COUNT = 3;    // consecutive low readings (~30 min) => real level shift, not jitter
-
 function filterAnomalies(snapshots) {
+  // The weekly quota resets ONLY on the plan's weekly boundary (which surfaces as a
+  // new weekId). Within a single weekId the cumulative weekPercent is monotonic
+  // non-decreasing — Claude does not reset the weekly limit mid-cycle (verified
+  // against the official Settings → Usage screen: the weekly bucket resets on its
+  // weekly boundary, never mid-week). Therefore ANY dip below the running peak of the
+  // current week is a spurious /usage read — typically a PTY read starved by many
+  // parallel `claude -p` sessions — not a real level shift. We forward-fill it away
+  // by keeping only readings that hold or exceed the week's running peak.
+  //
+  // This supersedes the #28 "sustained drop => re-baseline down" policy: that assumed
+  // the cycle could be non-monotonic, which is false, and it turned sustained spurious
+  // zeros into a real-looking mid-cycle valley (#35). Erring toward the running peak
+  // is also the safe side for a fuel gauge — it never under-reports consumption.
   const filtered = [];
   let lastValid = null;
-
-  // A drop at `idx` is a transient glitch (single bad /usage read) if the depressed
-  // level does NOT persist for SUSTAIN_COUNT same-week readings — it recovers near the
-  // baseline soon. If it DOES persist, the weekPercent genuinely shifted down (the cycle
-  // can be non-monotonic, e.g. a /usage reset/dip), so we re-baseline instead of freezing
-  // at the prior peak and discarding the rest of the week. See issue #28.
-  const isSustainedShift = (idx, baseline, weekId) => {
-    let n = 0;
-    for (let j = idx; j < snapshots.length && n < SUSTAIN_COUNT; j++) {
-      const s = snapshots[j];
-      if (s.weekId !== weekId) break;
-      if (s.weekPercent >= baseline - DROP_THRESHOLD) return false; // recovered => jitter
-      n++;
-    }
-    return n >= SUSTAIN_COUNT;
-  };
 
   for (let i = 0; i < snapshots.length; i++) {
     const s = snapshots[i];
@@ -208,22 +202,19 @@ function filterAnomalies(snapshots) {
       continue;
     }
 
-    // weekId going backwards is always jitter
+    // weekId going backwards is jitter (precise-vs-fallback reset anchor) — drop it
     if (s.weekId < lastValid.weekId) continue;
 
-    // New week => cycle reset, always accept
+    // New week => real cycle reset: accept and re-baseline (series restarts near 0)
     if (s.weekId !== lastValid.weekId) {
       filtered.push(s);
       lastValid = s;
       continue;
     }
 
-    // Same week: guard anomalous drops (incl. PTY-failure 0%). Skip only if transient;
-    // re-baseline (fall through) when the lower level is sustained.
-    const drop = lastValid.weekPercent - s.weekPercent;
-    if (drop > DROP_THRESHOLD || s.weekPercent === 0) {
-      if (!isSustainedShift(i, lastValid.weekPercent, s.weekId)) continue;
-    }
+    // Same week: enforce monotonicity. A reading below the running peak is spurious
+    // (PTY glitch / partial read); drop it and hold the peak (forward-fill).
+    if (s.weekPercent < lastValid.weekPercent) continue;
 
     filtered.push(s);
     lastValid = s;
