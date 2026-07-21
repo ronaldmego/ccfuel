@@ -9,7 +9,7 @@ const PORT = process.env.DASHBOARD_PORT || 3400;
 const HOST = process.env.DASHBOARD_HOST || '127.0.0.1';
 const TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
 // Auto-collector cadence (minutes). 0 disables the in-process scheduler.
-const COLLECT_INTERVAL_MIN = parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '10', 10);
+const COLLECT_INTERVAL_MIN = parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '20', 10);
 const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
 const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');
 
