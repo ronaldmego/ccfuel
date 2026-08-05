@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { getClaudeUsage } = require('./claude-usage');
 const { isPlausibleWeeklyReset } = require('./reset-cycle');
+const sessionMetrics = require('./session-metrics');
 
 const app = express();
 
@@ -13,6 +14,15 @@ const TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
 const COLLECT_INTERVAL_MIN = parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '20', 10);
 const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
 const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');
+
+// Per-session fuel from local transcripts (#39). Independent of the /usage collector:
+// different source, different cadence, and it must never block a PTY fetch.
+const SESSION_METRICS_FILE = path.join(__dirname, 'data', 'session-metrics.json');
+const TRANSCRIPTS_ROOT = process.env.DASHBOARD_TRANSCRIPTS_ROOT
+  || path.join(require('os').homedir(), '.claude', 'projects');
+const SESSION_SCAN_INTERVAL_MIN = parseInt(process.env.DASHBOARD_SESSION_SCAN_INTERVAL_MIN || '30', 10);
+const SESSION_MIN_FUEL = parseInt(
+  process.env.DASHBOARD_SESSION_MIN_FUEL || String(sessionMetrics.DEFAULT_MIN_FUEL), 10);
 
 // Cache for global usage (Claude /usage command)
 let globalUsageCache = {
@@ -74,7 +84,12 @@ function getWeekCycleInfo() {
   const localNow = new Date(localMs);
 
   let nextReset;
-  const weeklyResetsAt = globalUsageCache.data?.weekAll?.resetsAt;
+  // Prefer the live read, then the persisted cycle anchor. Without the anchor, every
+  // caller between boot and the first successful /usage fetch — the first curve snapshot,
+  // the session-fuel cycle window — derives weekId from the crude hour heuristic below,
+  // which lands days off. The anchor is already on disk; use it. See #37, #39.
+  const weeklyResetsAt = globalUsageCache.data?.weekAll?.resetsAt
+    || (persistedResets.weekAll && new Date(persistedResets.weekAll) > now ? persistedResets.weekAll : null);
 
   if (weeklyResetsAt) {
     nextReset = new Date(new Date(weeklyResetsAt).getTime() + (TZ_OFFSET * 60 * 60 * 1000));
@@ -99,7 +114,11 @@ function getWeekCycleInfo() {
   return {
     dayNum,
     elapsedDays,
+    // NOTE: cycleStartISO lives in the TZ_OFFSET-shifted space this function works in —
+    // it is what weekId is cut from, not a real instant. Anything comparing against real
+    // UTC timestamps (e.g. transcript times) must use cycleStartUTC instead.
     cycleStartISO: cycleStart.toISOString(),
+    cycleStartUTC: new Date(cycleStart.getTime() - (TZ_OFFSET * 60 * 60 * 1000)).toISOString(),
     weekId: cycleStart.toISOString().split('T')[0]
   };
 }
@@ -629,6 +648,82 @@ app.get('/api/weekly-history', (req, res) => {
   res.json({ history });
 });
 
+// === Per-session fuel from transcripts (#39) ===
+
+// Kept on disk so a restart doesn't force a cold pass (~670 MB / ~45 s over ~1800
+// sessions). Subsequent passes reuse every record whose file mtime and size are unchanged.
+let sessionMetricsState = { updatedAt: null, byFile: {}, scan: null };
+let sessionScanRunning = false;
+
+try {
+  if (fs.existsSync(SESSION_METRICS_FILE)) {
+    const saved = JSON.parse(fs.readFileSync(SESSION_METRICS_FILE, 'utf8'));
+    if (saved && saved.byFile) sessionMetricsState = saved;
+  }
+} catch (e) { /* start fresh */ }
+
+async function scanSessionMetrics() {
+  if (sessionScanRunning) {
+    console.log('⏭️  Session scan skipped: one is already running');
+    return sessionMetricsState;
+  }
+  sessionScanRunning = true;
+  try {
+    const result = await sessionMetrics.collectSessions(TRANSCRIPTS_ROOT, sessionMetricsState.byFile);
+    sessionMetricsState = {
+      updatedAt: new Date().toISOString(),
+      byFile: result.byFile,
+      scan: result.scan
+    };
+    try {
+      fs.writeFileSync(SESSION_METRICS_FILE, JSON.stringify(sessionMetricsState));
+    } catch (e) {
+      console.error('Failed to persist session metrics:', e.message);
+    }
+    console.log(`🧾 Session scan: ${result.scan.files} sessions `
+      + `(${result.scan.rescanned} re-read, ${result.scan.reused} cached) `
+      + `in ${(result.scan.durationMs / 1000).toFixed(1)}s`);
+  } catch (e) {
+    console.error('❌ Session scan failed:', e.message);
+  } finally {
+    sessionScanRunning = false;
+  }
+  return sessionMetricsState;
+}
+
+// What burned the quota: fuel by project and the heaviest sessions.
+// window=cycle (default, current weekly cycle) | 28d | all
+app.get('/api/session-metrics', (req, res) => {
+  const sessions = Object.values(sessionMetricsState.byFile || {});
+  const window = req.query.window || 'cycle';
+
+  let since = null;
+  if (window === 'cycle') {
+    since = getWeekCycleInfo().cycleStartUTC;
+  } else if (window === '28d') {
+    since = new Date(Date.now() - 28 * 24 * 3600 * 1000).toISOString();
+  }
+
+  const agg = sessionMetrics.aggregate(sessions, {
+    since,
+    minFuel: SESSION_MIN_FUEL,
+    topN: parseInt(req.query.top || '15', 10)
+  });
+
+  res.json({
+    ...agg,
+    windowKey: window,
+    updatedAt: sessionMetricsState.updatedAt,
+    scanning: sessionScanRunning,
+    scan: sessionMetricsState.scan
+  });
+});
+
+app.get('/api/session-metrics/refresh', async (req, res) => {
+  await scanSessionMetrics();
+  res.json({ ok: true, updatedAt: sessionMetricsState.updatedAt, scan: sessionMetricsState.scan });
+});
+
 // === Collection core (shared by the HTTP endpoint and the auto-collector) ===
 
 // Fetch /usage via PTY, refresh the cache, and persist snapshots.
@@ -711,5 +806,16 @@ app.listen(PORT, HOST, () => {
     setInterval(scheduledCollect, COLLECT_INTERVAL_MIN * 60 * 1000);
   } else {
     console.log('📡 Auto-collector disabled (DASHBOARD_COLLECT_INTERVAL_MIN=0)');
+  }
+
+  if (SESSION_SCAN_INTERVAL_MIN > 0) {
+    console.log(`🧾 Session scan enabled: every ${SESSION_SCAN_INTERVAL_MIN} min `
+      + `(min fuel ${SESSION_MIN_FUEL.toLocaleString()} tokens, root ${TRANSCRIPTS_ROOT})`);
+    // Deliberately after the /usage prime: a cold pass is I/O heavy and the live gauge
+    // is the more time-sensitive of the two.
+    setTimeout(scanSessionMetrics, 30000);
+    setInterval(scanSessionMetrics, SESSION_SCAN_INTERVAL_MIN * 60 * 1000);
+  } else {
+    console.log('🧾 Session scan disabled (DASHBOARD_SESSION_SCAN_INTERVAL_MIN=0)');
   }
 });

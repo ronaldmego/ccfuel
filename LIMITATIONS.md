@@ -70,12 +70,41 @@ Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to 
 | Weekly % (all models) | Claude `/usage` via PTY | Complete — includes all sources (CLI, web, API) |
 | Weekly % (Sonnet) | Claude `/usage` via PTY | Complete — account-level |
 | Daily/hourly consumption | Derived from % deltas between snapshots | Complete — based on official % |
+| Per-session fuel ("What burned it") | Local session transcripts | Partial — see below |
+
+---
+
+## Per-session fuel: tokens are not quota percent
+
+The "What burned it" panel has a **different source** from every other metric: the local JSONL
+transcripts under `~/.claude/projects`, not `/usage`. That brings its own limits.
+
+- **Tokens ≠ quota %.** Converting token counts into a quota percentage needs Anthropic's private
+  weighting, so the panel reports **shares** ("this project took 60% of the tokens you burned"),
+  never "this session used N% of your week". The two numbers are not comparable.
+- **The counters are disjoint, not nested.** `input_tokens`, `cache_creation_input_tokens`,
+  `cache_read_input_tokens` and `output_tokens` are separate totals. Fuel is therefore a **sum**
+  of what burns quota (`output + input + cache_creation`) and excludes cache reads — which are
+  ~96% of all tokens. Subtracting cache reads from input, as if they were a subset, produces
+  negative fuel (measured at `-9.45e9` across 1778 sessions, negative in 40% of them).
+- **Local host only.** Transcripts live on the machine that ran the session. A dashboard on one
+  body sees only that body's sessions, while `/usage` is account-wide. The two will not reconcile.
+- **A cut hides trivial sessions.** Sessions under `DASHBOARD_SESSION_MIN_FUEL` (default 10,000
+  tokens) are excluded: measured over 1778 real sessions that discards 63% of the files —
+  aborted starts and one-shot `claude -p` runs — while retaining 99.95% of all fuel. The panel
+  states how many sessions and tokens the cut hid, so it never reads as "this is everything".
+- **Privacy.** Transcripts contain full conversation text. The collector reads **only**
+  `timestamp` and `message.usage.*`, and never persists or serves message content. Labels are the
+  session id and project directory only.
+- **Retention is the transcripts'.** There is no separate pruning — the window is whatever Claude
+  Code has kept on disk.
 
 ---
 
 ## References
 
 - PTY implementation: `claude-usage.js`
+- Per-session fuel collector: `session-metrics.js`
 - Timezone details: `TECHNICAL-NOTES.md`
 - Anthropic Console: https://console.anthropic.com
 
