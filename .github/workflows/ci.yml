@@ -21,6 +21,7 @@ jobs:
           node --check server.js
           node --check claude-usage.js
           node --check reset-cycle.js
+          node --check session-metrics.js
 
       - name: Tests
         run: npm test

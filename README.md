@@ -121,11 +121,16 @@ Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──> 
 ccfuel/
 ├── server.js           # Express server + PTY integration
 ├── claude-usage.js     # PTY wrapper for Claude /usage
+├── reset-cycle.js      # Weekly reset cycle validation (guards weekId against misparses)
+├── session-metrics.js  # Per-session fuel from local transcripts
 ├── public/
 │   └── index.html      # Dashboard (all inline: HTML, CSS, JS)
+├── test/               # Dependency-free tests (npm test)
 ├── data/               # Local snapshots (gitignored, created at runtime)
-│   ├── weekly-history.json  # Weekly efficiency snapshots
-│   └── usage-curve.json     # Periodic % snapshots (~every 10 min)
+│   ├── weekly-history.json   # Weekly efficiency snapshots
+│   ├── usage-curve.json      # Periodic % snapshots
+│   ├── resets-cache.json     # Last accepted reset per cycle (the weekId anchor)
+│   └── session-metrics.json  # Per-session fuel + scan cache (mtime-keyed)
 ├── TECHNICAL-NOTES.md  # Measurement methodology
 ├── LIMITATIONS.md      # Known limitations
 └── package.json
@@ -143,6 +148,8 @@ ccfuel/
 | `/api/usage-deltas` | GET | Derived consumption from % deltas (rate, projection, daily, hourly, heatmap, curves) |
 | `/api/weekly-history` | GET | Weekly efficiency history |
 | `/api/config` | GET | Configuration (timezone) |
+| `/api/session-metrics` | GET | Per-session fuel by project and heaviest sessions (`?window=cycle\|28d\|all`, `?top=N`) |
+| `/api/session-metrics/refresh` | GET | Force a transcript rescan |
 
 **Global Usage:** Executes Claude Code via PTY (~15-20s), cached 5 min. Returns session%, weekAll%, weekSonnet%, extraUsage.
 
@@ -152,6 +159,7 @@ ccfuel/
 
 - **Consumption (main):** Derived from % deltas via /usage snapshots. Current rate (%/hour, last 6h), depletion projection, daily consumption (14 days), hourly consumption (48h), current cycle intensity heatmap. Source: `/api/usage-deltas`.
 - **Overview:** Global usage (source of truth: session %, weekly, sonnet), session and weekly gauges (% remaining). Source: `/api/global-usage`.
+- **What burned it:** Fuel by project and heaviest sessions, read from the local transcripts rather than `/usage` — the gauge says *how much* is gone, this says *what took it*. Reports shares, not quota percent: tokens and quota % are different units (see `LIMITATIONS.md`). Source: `/api/session-metrics`.
 - **Patterns:** Line chart with cumulative % (0-100%) per cycle hour. Current week (green) vs previous (gray) vs ideal pace (purple). Source: `curves` in `/api/usage-deltas`.
 - **Efficiency:** Current weekly efficiency (% used vs available, colors relative to cycle progress), previous weeks history. Source: `/api/weekly-history`.
 
