@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { getClaudeUsage } = require('./claude-usage');
+const { isPlausibleWeeklyReset } = require('./reset-cycle');
 
 const app = express();
 
@@ -35,12 +36,25 @@ function updatePersistedResets(usage) {
   // Only persist weekAll and weekSonnet resets — session reset parsing is unreliable
   // because ANSI cursor codes corrupt short times like "2am" (no month/day context to anchor)
   for (const key of ['weekAll', 'weekSonnet']) {
-    if (usage[key]?.resetsAt) {
-      persistedResets[key] = usage[key].resetsAt;
+    const fresh = usage[key]?.resetsAt;
+
+    if (fresh && isPlausibleWeeklyReset(fresh, persistedResets[key])) {
+      persistedResets[key] = fresh;
       changed = true;
     } else if (persistedResets[key] && new Date(persistedResets[key]) > new Date()) {
-      // PTY failed to parse, but persisted value is still in the future — inject it
+      // Either the PTY failed to parse, or it parsed a value that contradicts the known
+      // cycle. Both are unusable — keep the anchor and inject it so weekId stays stable.
+      if (fresh) {
+        console.warn(`⚠️  [reset] ${key} read ${fresh} but the cycle anchor is `
+          + `${persistedResets[key]} — rejecting as a misparse (#37)`);
+      }
       if (usage[key]) usage[key].resetsAt = persistedResets[key];
+    } else if (fresh && usage[key]) {
+      // Implausible read and no usable anchor: drop it rather than derive weekId from a
+      // date we've already proven impossible — the resetsAtHour fallback is less wrong.
+      console.warn(`⚠️  [reset] ${key} read ${fresh} is outside the weekly cycle and there `
+        + 'is no valid anchor — discarding it (#37)');
+      usage[key].resetsAt = null;
     }
   }
   // Clear session from persisted cache — it's unreliable

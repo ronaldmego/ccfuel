@@ -20,3 +20,7 @@ jobs:
         run: |
           node --check server.js
           node --check claude-usage.js
+          node --check reset-cycle.js
+
+      - name: Tests
+        run: npm test
