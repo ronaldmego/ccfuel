@@ -87,6 +87,12 @@ transcripts under `~/.claude/projects`, not `/usage`. That brings its own limits
   of what burns quota (`output + input + cache_creation`) and excludes cache reads — which are
   ~96% of all tokens. Subtracting cache reads from input, as if they were a subset, produces
   negative fuel (measured at `-9.45e9` across 1778 sessions, negative in 40% of them).
+- **One message, many rows.** A message is written to the transcript repeatedly while it
+  streams, each row a fuller snapshot under the same `message.id`. Fuel and turns count each
+  `message.id` **once** — the last snapshot, taken as a whole row, never a field-wise merge.
+  Summing rows instead inflated fuel ~2.6x (45,354 usage rows against 21,351 unique ids).
+  Rows carrying usage but **no** `message.id` cannot be deduplicated, so each counts once:
+  collapsing them would drop real consumption. There are none in the observed corpus.
 - **Local host only.** Transcripts live on the machine that ran the session. A dashboard on one
   body sees only that body's sessions, while `/usage` is account-wide. The two will not reconcile.
 - **A cut hides trivial sessions.** Sessions under `DASHBOARD_SESSION_MIN_FUEL` (default 10,000
