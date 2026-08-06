@@ -130,7 +130,7 @@ ccfuel/
 │   ├── weekly-history.json   # Weekly efficiency snapshots
 │   ├── usage-curve.json      # Periodic % snapshots
 │   ├── resets-cache.json     # Last accepted reset per cycle (the weekId anchor)
-│   └── session-metrics.json  # Per-session fuel + scan cache (mtime-keyed)
+│   └── session-metrics.json  # Per-session fuel + scan cache (mtime-keyed, schema-versioned)
 ├── TECHNICAL-NOTES.md  # Measurement methodology
 ├── LIMITATIONS.md      # Known limitations
 └── package.json

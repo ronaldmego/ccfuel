@@ -658,7 +658,17 @@ let sessionScanRunning = false;
 try {
   if (fs.existsSync(SESSION_METRICS_FILE)) {
     const saved = JSON.parse(fs.readFileSync(SESSION_METRICS_FILE, 'utf8'));
-    if (saved && saved.byFile) sessionMetricsState = saved;
+    if (saved && saved.byFile) {
+      // Refuse a cache written by an older algorithm. Records are reused by mtime+size,
+      // and neither changes when the code does, so an inflated pre-#42 cache would
+      // otherwise survive every deploy. Dropping it forces one cold rescan.
+      if (saved.version === sessionMetrics.SCHEMA_VERSION) {
+        sessionMetricsState = saved;
+      } else {
+        console.warn(`⚠️  [sessions] cache schema v${saved.version ?? '1 (unversioned)'} `
+          + `≠ v${sessionMetrics.SCHEMA_VERSION} — discarding it, a cold rescan follows (#42)`);
+      }
+    }
   }
 } catch (e) { /* start fresh */ }
 
@@ -671,6 +681,7 @@ async function scanSessionMetrics() {
   try {
     const result = await sessionMetrics.collectSessions(TRANSCRIPTS_ROOT, sessionMetricsState.byFile);
     sessionMetricsState = {
+      version: sessionMetrics.SCHEMA_VERSION,
       updatedAt: new Date().toISOString(),
       byFile: result.byFile,
       scan: result.scan

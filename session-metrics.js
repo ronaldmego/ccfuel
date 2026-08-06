@@ -25,6 +25,13 @@ const readline = require('readline');
 // still retains 99.95% of all fuel.
 const DEFAULT_MIN_FUEL = 10000;
 
+// Bump whenever the meaning of a cached record changes. `collectSessions` reuses records
+// by mtime+size, so without this a record computed by an older algorithm would survive a
+// deploy untouched — the file never changes, so it would never be re-read. Version 2
+// deduplicates by message.id (#42); version 1 records are inflated ~2.6x and must not be
+// reused.
+const SCHEMA_VERSION = 2;
+
 /** Quota-burning tokens for one assistant turn's `usage` block. */
 function turnFuel(usage) {
   if (!usage) return 0;
@@ -53,6 +60,11 @@ function projectLabel(slug) {
 /**
  * Scan one transcript. Returns null when the file carries no timestamp at all.
  * Streams line by line — transcripts reach hundreds of MB in aggregate.
+ *
+ * DEDUPLICATION (#42): a message is written to the transcript several times while it
+ * streams, each row a fuller snapshot carrying the SAME `message.id`. Summing rows counted
+ * one message once per snapshot and inflated fuel ~2.6x on real data (45,354 usage rows
+ * against 21,351 unique ids). Each id contributes exactly once.
  */
 async function scanTranscript(file) {
   const rl = readline.createInterface({
@@ -60,7 +72,12 @@ async function scanTranscript(file) {
     crlfDelay: Infinity
   });
 
-  let start = null, end = null, turns = 0, fuel = 0, events = 0;
+  let start = null, end = null, events = 0;
+
+  // id -> fuel of the LAST snapshot seen for that id, stored as one whole row's value.
+  const fuelByMessageId = new Map();
+  // Rows carrying usage but no id. They cannot be deduplicated, so each counts once.
+  let unidentifiedTurns = 0, unidentifiedFuel = 0;
 
   for await (const line of rl) {
     if (!line) continue;
@@ -76,13 +93,33 @@ async function scanTranscript(file) {
     if (line.indexOf('"usage"') === -1) continue;
     let parsed;
     try { parsed = JSON.parse(line); } catch (_) { continue; }
-    const usage = parsed && parsed.message && parsed.message.usage;
+    const message = parsed && parsed.message;
+    const usage = message && message.usage;
     if (!usage) continue;
-    turns++;
-    fuel += turnFuel(usage);
+
+    const id = message.id;
+    if (typeof id === 'string' && id !== '') {
+      // Last row wins. Snapshots grow as the message streams, so the final row is also the
+      // most complete one; on the real corpus last-wins and largest-wins produce the
+      // identical total (149,812,481), so the rule is not load-bearing for the number —
+      // only for determinism. The value is taken from ONE row as a unit: fields are never
+      // merged across snapshots, which would invent a message that never existed.
+      fuelByMessageId.set(id, turnFuel(usage));
+    } else {
+      // No id: nothing distinguishes a duplicate from a genuinely separate message. Each
+      // such row counts once — collapsing them would silently drop real consumption, and
+      // giving them a shared key would collide unrelated messages. There are zero of these
+      // in the current corpus; the branch exists so the behaviour is defined, not guessed.
+      unidentifiedTurns++;
+      unidentifiedFuel += turnFuel(usage);
+    }
   }
 
   if (!start) return null;
+
+  const turns = fuelByMessageId.size + unidentifiedTurns;
+  let fuel = unidentifiedFuel;
+  for (const f of fuelByMessageId.values()) fuel += f;
 
   return {
     start,
@@ -123,8 +160,12 @@ async function collectSessions(root, previous = {}) {
       let stat;
       try { stat = fs.statSync(file); } catch (_) { continue; }
 
+      // The version check must come first: mtime and size cannot change when the algorithm
+      // does, so without it a record computed by an older algorithm would be reused forever
+      // after a deploy (#42).
       const cached = previous[file];
-      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      if (cached && cached.v === SCHEMA_VERSION
+          && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
         byFile[file] = cached;
         reused++;
         continue;
@@ -136,6 +177,7 @@ async function collectSessions(root, previous = {}) {
       if (!record) continue;
 
       byFile[file] = {
+        v: SCHEMA_VERSION,
         id: name.replace(/\.jsonl$/, ''),
         project: dir.name,
         label: projectLabel(dir.name),
@@ -226,6 +268,7 @@ function aggregate(sessions, { since = null, until = null, minFuel = DEFAULT_MIN
 
 module.exports = {
   DEFAULT_MIN_FUEL,
+  SCHEMA_VERSION,
   turnFuel,
   projectLabel,
   scanTranscript,
