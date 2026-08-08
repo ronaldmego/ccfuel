@@ -741,15 +741,31 @@ app.get('/api/session-metrics/refresh', async (req, res) => {
 // Throws on PTY/spawn failure so callers can decide how to report it.
 // Callers MUST hold the `globalUsageCache.fetching` guard to avoid overlapping
 // PTY spawns (set it before calling, clear it in a finally block).
-async function fetchAndSnapshot() {
-  const usage = await getClaudeUsage(false);
+async function fetchAndSnapshot({ retryOnFailure = false } = {}) {
+  let usage = await getClaudeUsage(false);
+
+  // One retry inside the same cycle. Without it a failed fetch waits the full
+  // collector interval, so the panel can read up to 2x the interval stale — and
+  // spacing the interval out would make each failure hurt proportionally more.
+  // Scheduler only: an HTTP caller should not wait through a second 35s timeout.
+  if (!usage.success && retryOnFailure) {
+    console.warn('🔁 /usage fetch failed — retrying once in this cycle');
+    usage = await getClaudeUsage(false);
+  }
 
   // A timed-out / unparseable fetch comes back as success:false with 0% — never
   // let that overwrite a good cached value (it would make the dashboard read 0%
   // / "100% remaining" until the next good fetch). Keep the last good value.
   if (!usage.success) {
+    // Dump the raw text on the way out. The instrumentation below only fires on a
+    // weekly-% drop, which happened once; THIS is the failure that actually recurs,
+    // and until now it left nothing but the message — so a timeout could not be told
+    // apart from an expired /login, a trust dialog eating the keystrokes, or a panel
+    // that never loaded. Those need different fixes.
     console.warn('⚠️  /usage fetch returned no parseable data:', usage.errorMessage || 'unknown reason',
-      '— keeping last good value');
+      '— keeping last good value. Raw /usage:\n'
+      + (usage.rawClean || '(raw unavailable)'));
+    delete usage.rawClean; // never cache or serve it — this path can return `usage` itself
     return globalUsageCache.data || usage;
   }
 
@@ -798,7 +814,7 @@ async function scheduledCollect() {
   try {
     globalUsageCache.fetching = true;
     console.log(`⏰ Auto-collector running (every ${COLLECT_INTERVAL_MIN} min)...`);
-    await fetchAndSnapshot();
+    await fetchAndSnapshot({ retryOnFailure: true });
   } catch (e) {
     console.error('❌ Auto-collector failed:', e.message);
   } finally {
