@@ -5,7 +5,11 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- `/usage` collection is **~6x cheaper**: 35 s → ~6 s of process lifetime per fetch, 523 MB → 327 MB, two processes → one. Three causes, each of which produced correct data and so left no symptom to chase: the early-exit condition required a string (`extra usage`) the panel does not render, so every fetch silently ran to the 35 s timeout and was rescued by the timeout's own parse; `/usage` was typed on a fixed 4 s timer and was swallowed whenever the TUI had not finished booting, which was the recurring ~15% of fetches that returned nothing; and the spawn booted every configured MCP server to type a slash command that never calls a tool. The exit condition is now the parse succeeding, the keystroke retries until its echo appears, and the spawn runs with `--strict-mcp-config` and an empty MCP config ([#44](https://github.com/ronaldmego/ccfuel/issues/44))
+
 ### Added
+- A failed fetch now retries once inside the same collector cycle instead of waiting a full interval, and dumps the raw `/usage` buffer when the parse fails on timeout — previously the only failure that actually recurred was also the only one that left no evidence ([#44](https://github.com/ronaldmego/ccfuel/issues/44))
 - Diagnostic logging for a **sustained** weekly-% drop within a cycle (physically impossible for a cumulative unless the cycle reset): when `weekAll%` falls >15pp below the last good value, the raw `/usage` text and both `resetsAt` anchors are logged, so the residual mid-cycle-cliff mode can be diagnosed from evidence (reset-at-an-unexpected-day vs inflated-prior-read vs mis-parsed section). The raw blob is debug-only — never cached, served, or persisted ([#37](https://github.com/ronaldmego/ccfuel/issues/37))
 
 ### Fixed
