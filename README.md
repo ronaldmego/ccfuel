@@ -172,18 +172,47 @@ ccfuel/
 #### How it works
 
 ```
-node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s for autocomplete
-→ presses Enter → parses structured output → returns JSON with session%, weekAll%, weekSonnet%
+node-pty spawns `claude` with no MCP servers → retypes `/usage` until the echo appears on
+screen → presses Enter → resolves as soon as parseUsageOutput() succeeds
+→ returns JSON with session%, weekAll%, weekSonnet%
 ```
+
+There is no non-interactive way to get this: the CLI has no `claude usage` subcommand, so
+scraping the TUI is the only route. That makes the spawn the expensive part of the whole
+project, and two decisions keep it honest:
+
+- **No MCP servers** (`--strict-mcp-config` + an empty `--mcp-config`). The session only
+  types a slash command and never calls a tool, but a default spawn boots every MCP server
+  the user has configured. On a host with Playwright MCP that was a second process of
+  ~162 MB per fetch, for nothing.
+- **Every wait is event-driven.** Nothing waits on a fixed timer any more; see the history
+  below for why that mattered more than it sounds.
+
+#### What it costs per fetch
+
+Measured on a 12-core VPS, collector at its default 20-minute interval:
+
+| | Value |
+|---|---|
+| process lifetime | ~6 s |
+| RSS | ~327 MB (one process) |
+| CPU (user+sys) | ~9.7 s |
+| tokens | **zero** — `/usage` is a local slash command; no prompt is ever sent to the model |
+
+The RAM figure is a spike, not a leak: the process is killed at the end of each fetch, and
+that kill reaps the child tree with it. Spawning a full CLI is inherent to the approach —
+what is *not* inherent is holding it longer than needed, which is why the early-exit
+condition is load-bearing rather than an optimization.
 
 #### What can break it
 
 | Risk | Detail |
 |------|--------|
-| Claude CLI updates | Autocomplete timing, output format, or slash command behavior may change |
+| Claude CLI updates | Output format or slash command behavior may change. Timing changes are now absorbed by the echo/parse gates |
 | `CLAUDE*` env vars | Must be filtered out or Claude refuses to start (nested session detection) |
-| PTY timing | 4s init + 1.5s autocomplete wait are empirical — too fast = autocomplete captures input, too slow = timeout |
-| Timeout (35s) | PTY takes ~20-25s to complete. If Claude is slow (high load), may timeout |
+| Matching the TUI's **wording** | The early-exit condition must key off the *parse succeeding*, never off a specific string. A wording match that silently stops matching does not fail loudly — it degrades into "always hits the 35s timeout" while still returning correct data |
+| Startup flags | `--bare` looks ideal and is not: it ignores OAuth and the keychain by design (API key only), which breaks the very subscription quota this reads. `--disable-slash-commands` disables the one thing the fetch does |
+| Timeout (35s) | Now a genuine backstop rather than the normal path. A fetch that reaches it means `/usage` never rendered; the raw buffer is dumped to the log so it can be diagnosed |
 | node-pty version | Must match Node.js version. After Node upgrade, run `npm rebuild node-pty` |
 
 #### Rules before modifying
@@ -197,6 +226,18 @@ node-pty spawns `claude` → waits 4s for init → types `/usage` → waits 1.5s
 
 - **Pre-2026-03-01:** Used `execSync('claude usage')` which was never a valid CLI command. Worked by accident until it stopped.
 - **2026-03-01:** Rewritten to use node-pty with interactive `/usage` slash command.
+- **2026-08-08:** Cut from 35 s to ~6 s per fetch. Three findings worth keeping, because each
+  one hid behind correct-looking output:
+  - The early-exit condition required the string `extra usage`, which that account's panel
+    never renders. So it never fired and **every** fetch ran the full 35 s timeout — while
+    still returning the right numbers, because the timeout handler parses too. A cost bug
+    with no symptom. The gate is now `parseUsageOutput().success`.
+  - `/usage` was typed on a fixed 4 s timer. When the TUI had painted its banner but was not
+    yet accepting input, the keystroke was swallowed with no error to react to, `/usage`
+    never echoed, and the fetch burned 35 s on ~891 captured bytes. That was the recurring
+    ~15 % failure — not an expired login. The fix is to retype until the echo appears.
+  - The spawn loaded every configured MCP server (523 MB, two processes) to type one slash
+    command it never used a tool for.
 
 ## Documentation
 
