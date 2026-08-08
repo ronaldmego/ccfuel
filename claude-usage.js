@@ -9,7 +9,17 @@ function getClaudeUsage(debug = false) {
   return new Promise((resolve) => {
     let output = '';
     let settled = false;
+    let enterSent = false;
+    let enterScheduled = false;
+    let typeRetry = null;
     const TOTAL_TIMEOUT = 35000;
+
+    const pressEnter = () => {
+      if (settled || enterSent) return;
+      enterSent = true;
+      if (typeRetry) clearInterval(typeRetry);
+      term.write('\r');
+    };
 
     // Filter out all Claude Code session markers to avoid nested session detection
     const cleanEnv = Object.fromEntries(
@@ -18,7 +28,16 @@ function getClaudeUsage(debug = false) {
       )
     );
 
-    const term = pty.spawn('claude', [], {
+    // No MCP servers: this session only types a slash command and never calls a
+    // tool, but a default spawn still boots every configured MCP server. Measured
+    // on a host with Playwright MCP configured: 523 MB / 14.24s CPU per fetch with
+    // them, 327 MB / 8.86s without, and the usage panel renders at the same time
+    // (5.9s vs 5.8s) — they were pure overhead, not latency we were buying.
+    //
+    // NOT `--bare`, tempting as it looks: it ignores OAuth and the keychain by
+    // design (API key only), which would break the very subscription quota this
+    // reads. Nor `--disable-slash-commands` — the whole fetch is typing /usage.
+    const term = pty.spawn('claude', ['--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}'], {
       name: 'xterm',
       cols: 200,
       rows: 50,
@@ -28,6 +47,7 @@ function getClaudeUsage(debug = false) {
     const cleanup = () => {
       if (!settled) {
         settled = true;
+        if (typeRetry) clearInterval(typeRetry);
         try { term.kill(); } catch (_) {}
       }
     };
@@ -44,12 +64,30 @@ function getClaudeUsage(debug = false) {
     term.onData((data) => {
       output += data;
 
-      // Detect when /usage output is complete
-      if (output.includes('/usage') && (
-        /extra usage/i.test(output) &&
-        /resets/i.test(output) &&
-        /current\s+(session|week)/i.test(output)
-      )) {
+      // El eco confirma que la TUI aceptó la tecla: recién ahí tiene sentido Enter.
+      // Va acá y no en el tick del reintento para no esperar hasta 1.5s de más en el
+      // camino feliz; el pequeño respiro deja que se dibuje el autocompletado.
+      if (!enterScheduled && !enterSent && output.includes('/usage')) {
+        enterScheduled = true;
+        setTimeout(pressEnter, 400);
+      }
+
+      // Detect when /usage output is complete.
+      //
+      // This used to also require /extra usage/i. That string is NOT in the panel
+      // this account renders, so the condition never fired and EVERY fetch ran the
+      // full 35s timeout — even though the data was on screen at ~6s and parsed
+      // fine. It looked healthy from the outside because the timeout handler parses
+      // too, so the value was always correct; only the cost was wrong (4x the
+      // process lifetime, 4x the window for pm2 to restart under it).
+      //
+      // The gate is now cheap markers first, then the parser itself as the
+      // authority. Waiting for "the parse succeeds" is what we actually mean, and
+      // unlike a wording match it cannot drift when the TUI changes its copy.
+      if (output.includes('/usage')
+          && /resets/i.test(output)
+          && /current\s+(session|week)/i.test(output)
+          && parseUsageOutput(output).success) {
         setTimeout(() => {
           if (!settled) {
             clearTimeout(timer);
@@ -79,21 +117,22 @@ function getClaudeUsage(debug = false) {
       }
     });
 
-    // Step 1: Wait for Claude to initialize (4s)
-    setTimeout(() => {
-      if (!settled) {
-        if (debug) console.log('Typing /usage...');
-        term.write('/usage');
-      }
-    }, 4000);
-
-    // Step 2: Wait for autocomplete menu to appear, then press Enter (1.5s later)
-    setTimeout(() => {
-      if (!settled) {
-        if (debug) console.log('Pressing Enter...');
-        term.write('\r');
-      }
-    }, 5500);
+    // Typing used to be two blind timers: /usage at 4s, Enter at 5.5s. Measured
+    // failure, captured from a real run: the TUI had painted its banner but was not
+    // accepting input yet at 4s, so the keystrokes were silently swallowed, /usage
+    // never echoed, and the fetch burned the full 35s with 891 bytes in the buffer.
+    // That is the recurring ~15% — not an expired login, not a trust dialog.
+    //
+    // A keystroke into a TUI that is not listening leaves no error to react to, so
+    // the only reliable signal is the echo itself: retype until /usage appears on
+    // screen, and only then press Enter.
+    const typeUsage = () => { if (!settled && !enterSent) term.write('/usage'); };
+    setTimeout(typeUsage, 4000);
+    typeRetry = setInterval(() => {
+      if (settled || enterSent || output.includes('/usage')) { clearInterval(typeRetry); return; }
+      if (debug) console.log('Echo de /usage aun ausente — reintentando la tecla');
+      typeUsage();
+    }, 1500);
   });
 }
 
