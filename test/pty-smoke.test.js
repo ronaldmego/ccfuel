@@ -36,9 +36,12 @@ async function run() {
     return;
   }
 
-  // 2. On unix, node-pty execs through a `spawn-helper` binary. Non-executable is the
-  //    upstream packaging bug; assert it directly so the failure names itself instead of
-  //    surfacing as an opaque "posix_spawnp failed."
+  // 2. `spawn-helper` is a macOS-only artifact: the native code only execs through it under
+  //    `#if defined(__APPLE__)`. On Linux node-pty compiles from source (no prebuild is
+  //    published) and produces no helper at all — verified on ubuntu-latest, where the spawn
+  //    round-trip below passes with the file absent. So the mode is asserted on darwin only;
+  //    that is where the upstream packaging bug lives, and asserting it by name keeps the
+  //    failure legible instead of an opaque "posix_spawnp failed."
   const fs = require('fs');
   const path = require('path');
   const root = path.dirname(require.resolve('node-pty/package.json'));
@@ -51,14 +54,24 @@ async function run() {
     .map(d => path.join(d, 'spawn-helper'))
     .find(p => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } });
 
-  if (helper) {
+  if (process.platform === 'darwin') {
+    if (helper) {
+      const mode = fs.statSync(helper).mode;
+      record('spawn-helper is executable (node-pty 1.1.0 ships it 0644)',
+        (mode & 0o111) !== 0,
+        `mode ${(mode & 0o777).toString(8)} on ${path.relative(root, helper)}`);
+    } else {
+      record('spawn-helper is present in the resolved native dir (required on macOS)', false,
+        `looked in: ${helperDirs.join(', ')}`);
+    }
+  } else if (helper) {
+    // Present on a non-darwin platform: still must be executable if it exists.
     const mode = fs.statSync(helper).mode;
-    record('spawn-helper is executable (node-pty 1.1.0 ships it 0644)',
-      (mode & 0o111) !== 0,
-      `mode ${(mode & 0o777).toString(8)} on ${path.relative(root, helper)}`);
+    record('spawn-helper, where present, is executable', (mode & 0o111) !== 0,
+      `mode ${(mode & 0o777).toString(8)}`);
   } else {
-    record('spawn-helper is present in the resolved native dir', false,
-      `looked in: ${helperDirs.join(', ')}`);
+    console.log(`  skip   spawn-helper mode check (no helper on ${process.platform}; `
+      + 'macOS-only code path)');
   }
 
   // 3. An actual spawn round-trip through the PTY.
