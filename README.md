@@ -76,11 +76,17 @@ full methodology.
 
 ## Screenshots
 
+All three are **synthetic demo data** from `npm run demo` — not real usage. That is what the
+orange banner across the top says, and it is pinned so it cannot scroll out of a capture.
+
 ![Overview](./screenshots/dashboard-overview.png)
-*Overview — official usage, session/weekly quota gauges, burn rate, and daily/hourly consumption with an activity heatmap*
+*Overview — official `/usage` gauges, cumulative curve against previous cycles, burn rate, daily and hourly consumption, and the activity heatmap. Synthetic data.*
 
 ![Weekly](./screenshots/weekly-tab.png)
-*Weekly — cycle progress, cumulative curves per week, and weekly history*
+*Weekly — cycle progress, one cumulative curve per cycle, and weekly history: which cycles hit 100% and how many hours they spent locked out. Synthetic data.*
+
+![What burned it](./screenshots/what-burned-it.png)
+*What burned it — the local fuel **proxy**: shares by project and the heaviest sessions, from your transcripts rather than `/usage`. Project labels here (`demo-api`, `demo-web`, …) are invented; on a real instance they are your own project directories. Synthetic data.*
 
 ## Stack
 

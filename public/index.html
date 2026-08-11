@@ -335,8 +335,20 @@
     .footer { text-align: center; padding: 20px; color: var(--ink-3); font-size: 0.78em; border-top: 1px solid var(--border); margin-top: 24px; }
     .footer span { font-family: var(--mono); color: var(--ink-2); }
     /* Capture mode (DASHBOARD_DEMO=1). Hidden unless /api/config reports demo: true, so it
-       can never appear over real data. */
+       can never appear over real data.
+
+       Sticky on purpose: a banner that scrolls away lets a screenshot of a panel further down
+       the page look like production. Pinned, every capture and every second of a screen
+       recording carries the marker, wherever the viewer has scrolled to.
+
+       `.header` is also sticky at top:0 with z-index 100, so the two would collide and the
+       header would win. In demo mode the header is pushed down by the banner's measured height
+       (set as --demo-banner-h when the banner is unhidden) and the banner sits above it.
+       Normal mode is untouched: the banner stays hidden and the header keeps top:0. */
     .demo-banner {
+      position: sticky;
+      top: 0;
+      z-index: 110;
       background: #b45309;
       color: #fff;
       font-size: 12px;
@@ -346,6 +358,7 @@
       text-align: center;
       padding: 7px 12px;
     }
+    body.demo .header { top: var(--demo-banner-h, 29px); }
   </style>
 </head>
 <body>
@@ -1799,7 +1812,12 @@
     fetch('/api/config').then(r => r.json()).then(cfg => {
       if (cfg.tzOffset != null) TZ_OFFSET = cfg.tzOffset;
       if (cfg.demo) {
-        document.getElementById('demo-banner').hidden = false;
+        const banner = document.getElementById('demo-banner');
+        banner.hidden = false;
+        // Measure rather than hardcode: the offset has to match whatever the banner actually
+        // renders at, or the sticky header overlaps it as you scroll.
+        document.body.classList.add('demo');
+        document.body.style.setProperty('--demo-banner-h', banner.offsetHeight + 'px');
         document.title = 'DEMO · ' + document.title;
       }
     }).catch(() => {}).finally(() => {
