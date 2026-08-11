@@ -31,9 +31,12 @@ Claude Code has a weekly token limit. Burn it all and you're locked out until re
 | cacheCreationTokens | Yes | First cache write — costs quota |
 | **cacheReadTokens** | **No** | ~96% of volume, free or near-free |
 
-**Formula:** `realTokens = totalTokens - cacheReadTokens`
+**Formula:** `fuel = outputTokens + inputTokens + cacheCreationTokens`
 
-See `TECHNICAL-NOTES.md` for the full methodology.
+The four counters the API reports are **disjoint totals**, not nested. Writing this as
+`input - cacheRead` looks equivalent and is not: it mixes separate counters and goes negative
+whenever cache reads dominate, which is most of the time. Add up what costs; never subtract
+what doesn't. See `TECHNICAL-NOTES.md` for the full methodology.
 
 ## Screenshots
 
@@ -54,33 +57,50 @@ Process Manager: PM2 (optional)
 
 ## Prerequisites
 
-- **Node.js** 18+
-- **Claude Code** installed and authenticated
-- **Build tools** (required by `node-pty` native module):
+- **Node.js 22 or newer.** Tested on 22 LTS, 24 LTS and 25 (see `engines` in `package.json`).
+  Earlier lines are past end-of-life and are not tested.
+- **Claude Code** installed, authenticated, and having trusted the folder the server runs in
+  (see [Troubleshooting](#troubleshooting) — this one bites on first run).
+- **A C++ toolchain, on Linux only.** `node-pty` is a native module. It publishes prebuilt
+  binaries for macOS and Windows, so those install without a compiler; there is no Linux
+  prebuild, so Linux compiles from source:
 
-| OS | Install command |
-|----|----------------|
-| Ubuntu/Debian | `sudo apt install build-essential python3` |
-| macOS | `xcode-select --install` |
-| Windows | `npm install -g windows-build-tools` |
+| OS | Needs build tools? |
+|----|--------------------|
+| macOS | No — prebuilt binary ships in the package |
+| Windows | No — prebuilt binary ships in the package |
+| Ubuntu/Debian | Yes — `sudo apt install build-essential python3` |
 
 ## Quick Start
 
 Works on any machine where Claude Code is installed. Reads `~/.claude/` logs automatically.
 
 ```bash
-# Clone
 git clone https://github.com/ronaldmego/ccfuel.git
 cd ccfuel
 
-# Install
-npm install
-
-# Run
+npm ci          # `npm ci` installs exactly the locked dependency set
 node server.js
 ```
 
-Open `http://localhost:3400` in your browser. That's it — the dashboard reads your local Claude Code logs and fetches account-level usage via PTY automatically.
+Open `http://localhost:3400`. The dashboard reads your local Claude Code transcripts and
+fetches account-level usage by driving `/usage` in a PTY.
+
+**First run:** Claude Code trusts folders one at a time, and the trust prompt swallows the
+keystrokes ccfuel types. If the gauge stays empty, run `claude` once inside the ccfuel folder
+and accept, or point `DASHBOARD_CLAUDE_CWD` at a folder you have already trusted. The
+dashboard tells you which of the two it is — see [Troubleshooting](#troubleshooting).
+
+### Take a screenshot without showing your own numbers
+
+```bash
+npm run demo     # http://localhost:3401
+```
+
+Builds a synthetic fixture in `demo-data/` and serves it with both collectors off — no PTY
+spawn, no transcript read — behind a "synthetic data" banner. Useful for screenshots, issue
+reports and demos. It is also the fixture the server smoke test runs against. It cannot show
+real usage, and it changes nothing about `node server.js`.
 
 ### Optional: PM2 for background running
 
@@ -91,18 +111,27 @@ pm2 start ecosystem.config.cjs
 
 ### Optional: Custom configuration
 
+Every setting is an environment variable. Nothing reads `.env` implicitly — pass it to Node
+yourself:
+
 ```bash
 cp .env.example .env
-# Edit .env — set host, port, etc.
+# edit .env, then:
+node --env-file=.env server.js
 ```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DASHBOARD_HOST` | `127.0.0.1` | Bind address |
 | `DASHBOARD_PORT` | `3400` | Server port |
-| `DASHBOARD_TIMEZONE` | `-5` | UTC offset in hours (e.g., `-5` for EST, `+1` for CET, `0` for UTC) |
-| `DASHBOARD_COLLECT_INTERVAL_MIN` | `10` | Server-side auto-collector cadence in minutes. `0` disables it |
-| `CLAUDE_LOGS_DIR` | `~/.claude` | Path to Claude Code JSONL logs |
+| `DASHBOARD_TIMEZONE` | `-5` | UTC offset in hours (`-5` EST, `+1` CET, `0` UTC). No DST. Used by the server, the frontend and the `/usage` reset parser |
+| `DASHBOARD_DATA_DIR` | `./data` | Where snapshots are written. Created on boot if missing |
+| `DASHBOARD_COLLECT_INTERVAL_MIN` | `20` | `/usage` auto-collector cadence in minutes. `0` disables it |
+| `DASHBOARD_CLAUDE_CWD` | *(inherit)* | Folder to spawn `claude` in. Set it to a folder Claude Code already trusts |
+| `DASHBOARD_SESSION_SCAN_INTERVAL_MIN` | `30` | Transcript scan cadence in minutes. `0` disables the "What burned it" panel |
+| `DASHBOARD_SESSION_MIN_FUEL` | `10000` | Sessions under this many fuel tokens are treated as noise |
+| `DASHBOARD_TRANSCRIPTS_ROOT` | `~/.claude/projects` | Where session transcripts live |
+| `DASHBOARD_DEMO` | *(off)* | `1` serves `DASHBOARD_DATA_DIR` as-is and collects nothing. Set by `npm run demo`; never set it on a real instance |
 
 ## Architecture
 
@@ -113,7 +142,7 @@ Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──> 
 ```
 
 - **claude-usage.js** runs Claude Code's `/usage` command via PTY to get account-level percentages
-- An in-process auto-collector in `server.js` fetches `/usage` and saves a snapshot to `data/usage-curve.json` every `DASHBOARD_COLLECT_INTERVAL_MIN` minutes (default 10), independent of whether the dashboard is open. It primes once ~5s after boot and is guarded against overlapping PTY spawns. Opening the dashboard or hitting `/api/global-usage` still triggers an on-demand refresh on top of the schedule.
+- An in-process auto-collector in `server.js` fetches `/usage` and saves a snapshot to `data/usage-curve.json` every `DASHBOARD_COLLECT_INTERVAL_MIN` minutes (default 20), independent of whether the dashboard is open. It primes once ~5s after boot, retries once inside a cycle on failure, and is guarded against overlapping PTY spawns. Opening the dashboard or hitting `/api/global-usage` still triggers an on-demand refresh on top of the schedule.
 
 ### File Structure
 
@@ -125,7 +154,11 @@ ccfuel/
 ├── session-metrics.js  # Per-session fuel from local transcripts
 ├── public/
 │   └── index.html      # Dashboard (all inline: HTML, CSS, JS)
-├── test/               # Dependency-free tests (npm test)
+├── scripts/
+│   ├── demo.js               # `npm run demo` — serve synthetic data for screenshots
+│   ├── synthetic-fixture.js  # the fixture generator (shared with the smoke test)
+│   └── fix-pty-permissions.js # postinstall: restore node-pty's spawn-helper exec bit
+├── test/               # Dependency-free tests + PTY and server smokes (npm test)
 ├── data/               # Local snapshots (gitignored, created at runtime)
 │   ├── weekly-history.json   # Weekly efficiency snapshots
 │   ├── usage-curve.json      # Periodic % snapshots
@@ -147,21 +180,38 @@ ccfuel/
 | `/api/usage-curve` | GET | Periodic % snapshots (for weekly comparison) |
 | `/api/usage-deltas` | GET | Derived consumption from % deltas (rate, projection, daily, hourly, heatmap, curves) |
 | `/api/weekly-history` | GET | Weekly efficiency history |
-| `/api/config` | GET | Configuration (timezone) |
+| `/api/config` | GET | Configuration (timezone, demo flag) |
 | `/api/session-metrics` | GET | Per-session fuel by project and heaviest sessions (`?window=cycle\|28d\|all`, `?top=N`) |
 | `/api/session-metrics/refresh` | GET | Force a transcript rescan |
 
-**Global Usage:** Executes Claude Code via PTY (~15-20s), cached 5 min. Returns session%, weekAll%, weekSonnet%, extraUsage.
+**Global Usage:** Executes Claude Code via PTY (~6s on the happy path, 35s hard timeout),
+cached 5 min. Returns `session%`, `weekAll%`, `weekSonnet%`, `extraUsage`.
+
+A read either succeeds or says why. `success: true` means the weekly percentage parsed — the
+one field that is never defaulted, so a real `0%` is distinguishable from a failed read.
+`success: false` carries a `failureKind` (`trust-prompt`, `login-required`, `timeout`,
+`exited-early`) and a message; a failed read never overwrites the last good value.
+`session.percent` and `weekSonnet.percent` still default to `0` for backwards compatibility,
+so a `0` from those two is not evidence of a real zero.
 
 **Usage Curve:** Each successful global-usage fetch saves a snapshot to `data/usage-curve.json` (%, hour, cycle day). Auto-pruned to last 28 days.
 
 ### Dashboard Tabs
 
-- **Consumption (main):** Derived from % deltas via /usage snapshots. Current rate (%/hour, last 6h), depletion projection, daily consumption (14 days), hourly consumption (48h), current cycle intensity heatmap. Source: `/api/usage-deltas`.
-- **Overview:** Global usage (source of truth: session %, weekly, sonnet), session and weekly gauges (% remaining). Source: `/api/global-usage`.
-- **What burned it:** Fuel by project and heaviest sessions, read from the local transcripts rather than `/usage` — the gauge says *how much* is gone, this says *what took it*. Reports shares, not quota percent: tokens and quota % are different units (see `LIMITATIONS.md`). Source: `/api/session-metrics`.
-- **Patterns:** Line chart with cumulative % (0-100%) per cycle hour. Current week (green) vs previous (gray) vs ideal pace (purple). Source: `curves` in `/api/usage-deltas`.
-- **Efficiency:** Current weekly efficiency (% used vs available, colors relative to cycle progress), previous weeks history. Source: `/api/weekly-history`.
+Two tabs. Everything on the Overview tab is one scrolling page, not separate views.
+
+- **Overview** — *Official usage* (session %, weekly all, weekly Sonnet, straight from
+  `/usage`) and the session/weekly gauges, source `/api/global-usage`. Then, derived from the
+  % deltas between snapshots (source `/api/usage-deltas`): *Cumulative usage* per cycle hour
+  against the previous cycles and an ideal pace, *Burn rate* with a depletion estimate, *Daily
+  consumption* (14 days), *Hourly consumption* (48h) and the *Activity pattern* heatmap by
+  weekday and hour. Last, *What burned it* — fuel by project and the heaviest sessions, read
+  from the local transcripts rather than `/usage`: the gauge says *how much* is gone, this says
+  *what took it*. It reports shares, never quota percent, because tokens and quota % are
+  different units (see `LIMITATIONS.md`). Source `/api/session-metrics`.
+- **Weekly** — cycle progress for the current week, cumulative curves per cycle, and weekly
+  history including when a cycle hit 100% and how long it was locked out. Source
+  `/api/weekly-history` plus `curves` from `/api/usage-deltas`.
 
 ## Critical Components
 
@@ -213,7 +263,8 @@ condition is load-bearing rather than an optimization.
 | Matching the TUI's **wording** | The early-exit condition must key off the *parse succeeding*, never off a specific string. A wording match that silently stops matching does not fail loudly — it degrades into "always hits the 35s timeout" while still returning correct data |
 | Startup flags | `--bare` looks ideal and is not: it ignores OAuth and the keychain by design (API key only), which breaks the very subscription quota this reads. `--disable-slash-commands` disables the one thing the fetch does |
 | Timeout (35s) | Now a genuine backstop rather than the normal path. A fetch that reaches it means `/usage` never rendered; the raw buffer is dumped to the log so it can be diagnosed |
-| node-pty version | Must match Node.js version. After Node upgrade, run `npm rebuild node-pty` |
+| Folder trust | Claude Code trusts folders one at a time and asks before working in an unknown one. That prompt eats the keystrokes. Detected by name (`failureKind: trust-prompt`) and never answered automatically — accepting a trust prompt is the user's decision, not a dashboard's |
+| node-pty packaging | It is a Node-API addon, so one binary works across Node versions — no rebuild after a Node upgrade. The real trap is macOS: the published prebuild's `spawn-helper` is not executable, and every spawn then fails with `posix_spawnp failed.` A `postinstall` restores the bit; see `scripts/fix-pty-permissions.js` |
 
 #### Rules before modifying
 
@@ -239,6 +290,34 @@ condition is load-bearing rather than an optimization.
   - The spawn loaded every configured MCP server (523 MB, two processes) to type one slash
     command it never used a tool for.
 
+## Troubleshooting
+
+The gauge is empty, or `/api/global-usage` returns `success: false`. Read `failureKind`:
+
+| `failureKind` | What happened | Fix |
+|---|---|---|
+| `trust-prompt` | Claude Code is asking whether to trust the folder ccfuel spawned it in, and the prompt is eating the `/usage` keystrokes | Run `claude` once in that folder and accept, or set `DASHBOARD_CLAUDE_CWD` to a folder you already trust |
+| `login-required` | Claude Code is not authenticated | Run `claude`, complete `/login`, retry |
+| `timeout` | The panel never rendered within 35s | The raw buffer is in the server log; check whether `/usage` looks different from what `parseUsageOutput()` expects |
+| `exited-early` | `claude` exited before the panel appeared | Usually a CLI error on startup — run `node claude-usage.js --debug` |
+
+`Error: posix_spawnp failed.` on macOS means node-pty's `spawn-helper` lost its executable
+bit. `npm ci` repairs it via `postinstall`; to check by hand, `npm test` reports the mode.
+
+`Cannot find module 'node-pty'` means the install did not complete — re-run `npm ci`.
+
+## Testing
+
+```bash
+npm test
+```
+
+Pure-function tests, the `/usage` parser against synthetic captures, a PTY spawn round-trip
+(no Claude Code needed), and a real `node server.js` boot over the synthetic fixture. The last
+two exist because a suite of pure functions plus `node --check` stayed green through both
+failures that made the published Quick Start unusable — a missing dependency and a native
+module that could not spawn. CI runs the whole thing on Linux and macOS, on Node 22 and 24.
+
 ## Documentation
 
 | File | Contents |
@@ -250,7 +329,8 @@ condition is load-bearing rather than an optimization.
 ## Design Philosophy
 
 - **Zero build step** — No React, no webpack. Vanilla JS + Chart.js.
-- **Single dependency** — Express. That's it.
+- **Two dependencies** — Express, and `node-pty` because there is no non-interactive way to
+  read `/usage`. Both are load-bearing; nothing else is.
 - **Real metrics only** — Cache reads are noise. We filter them out.
 - **Works anywhere** — Any machine with Claude Code installed and authenticated.
 

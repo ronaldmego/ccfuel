@@ -19,16 +19,31 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 
 ### Risks
 
-- **Fragile:** PTY timing is empirical (4s init, 1.5s autocomplete wait). Claude CLI updates can break it.
-- **Slow:** Each fetch takes ~20-25 seconds (spawn, init, command, parse, kill).
+- **Fragile:** the whole read is screen-scraping a TUI. Claude CLI updates can change the
+  panel's wording or layout and break `parseUsageOutput()`. Timing changes no longer break it:
+  the fetch waits on the keystroke's echo and on the parse succeeding, not on fixed timers.
+- **Costly per fetch:** ~6 s of process lifetime and ~327 MB RSS on the happy path — a whole
+  CLI is booted to type one slash command. Zero tokens: `/usage` is local.
 - **One at a time:** Cannot run multiple PTY sessions simultaneously (Claude detects and rejects).
-- **Env-sensitive:** Must filter `CLAUDECODE` env var or Claude refuses to start.
+- **Env-sensitive:** all `CLAUDE*` env vars must be filtered or Claude refuses to start
+  (nested-session detection).
+- **Folder trust:** Claude Code trusts folders individually, and its trust prompt swallows the
+  keystrokes. A fresh clone is by definition an untrusted folder, so on first run every fetch
+  fails until the folder is accepted or `DASHBOARD_CLAUDE_CWD` points somewhere already
+  trusted. ccfuel detects this state and reports it; it never answers the prompt.
+- **Native module, macOS packaging:** node-pty 1.1.0 publishes its macOS prebuild with a
+  non-executable `spawn-helper`, and every spawn then fails with `posix_spawnp failed.`
+  regardless of Node version. Repaired by a `postinstall`
+  (`scripts/fix-pty-permissions.js`); it will be removable once upstream ships the bit.
 
 ### Mitigation
 
 - 5-minute cache on successful fetches (avoids hammering PTY)
-- 35-second timeout with graceful fallback
+- 35-second timeout with graceful fallback, plus one retry inside the same collector cycle
 - **A failed/timed-out fetch keeps the last good cached value** — a transient PTY timeout never overwrites real usage with `0%` (see Historical bug below)
+- Failures are named, not generic: `failureKind` is one of `trust-prompt`, `login-required`,
+  `timeout`, `exited-early`. The first two are detected during boot and end the fetch
+  immediately instead of spending the full 35 s on a state no retry can clear.
 - Debug mode: `node claude-usage.js --debug` writes raw output to `/tmp/claude-usage-debug.log`
 
 ### Historical bug: transient PTY timeout read as 0% (#34)
@@ -43,18 +58,30 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 
 ---
 
-## Timezone: Hardcoded UTC-5
+## Timezone: one fixed offset, no DST
 
-The dashboard assumes **Panama (UTC-5)** as a fixed timezone. It does not use DST or detect the user's timezone.
+The dashboard works in a **single UTC offset**, set by `DASHBOARD_TIMEZONE` and defaulting to
+`-5`. It never reads the browser's or the host's zone, and it has no DST handling — an offset,
+not a timezone. In a DST region the derived day boundaries drift by an hour for part of the year.
 
 | Aspect | Status |
 |--------|--------|
-| Weekly reset time | Interpreted as Panama time |
-| "Spent Today" | Day calculated in Panama time |
-| Hourly charts | Blocks grouped by Panama hour |
-| Browser in other timezone | No impact — does not depend on browser timezone |
+| Weekly reset time | The `/usage` panel prints wall-clock with no zone; interpreted at the configured offset |
+| Day boundaries ("spent today") | Cut at the configured offset |
+| Hourly charts and heatmap | Bucketed by hour at the configured offset |
+| Browser in another timezone | No impact — the frontend takes the offset from `/api/config` |
+| DST | Not handled |
 
-To use a different timezone, update `PANAMA_OFFSET` in `index.html` and the equivalent in `server.js`. See `TECHNICAL-NOTES.md` Timezone section for details.
+One setting covers all three layers: the server, the frontend (via `/api/config`) and the
+`/usage` reset parser.
+
+### Known edge: reset dates near the year boundary
+
+The panel prints dated resets without a year (`Aug 18, 10am`), so the parser assumes the
+current one. For the few days each year when the next reset falls after 31 December, that
+yields a date in the past, which the parser discards rather than trusting. The effect is
+bounded — the cycle keeps running off the persisted reset anchor and the `resetsAtHour`
+fallback — but the dated reset is unavailable during that window.
 
 ### Historical bug: getTimezoneOffset
 
@@ -104,6 +131,25 @@ transcripts under `~/.claude/projects`, not `/usage`. That brings its own limits
   session id and project directory only.
 - **Retention is the transcripts'.** There is no separate pruning — the window is whatever Claude
   Code has kept on disk.
+
+---
+
+---
+
+## Platform support
+
+Declared support is what is actually exercised, not what might work.
+
+| | Status |
+|---|---|
+| Node.js | **22+** (`engines`). CI runs 22 and 24; 25 verified by hand. Older lines are EOL and untested |
+| macOS | Supported. Verified end-to-end on macOS 26 / arm64 with Node 22, 24 and 25 |
+| Linux | Supported. The deploy target; needs a C++ toolchain since node-pty has no Linux prebuild |
+| Windows | **Untested.** node-pty ships a Windows prebuild and nothing in the code is POSIX-only, but no one has run it. Reports welcome |
+
+The `/usage` fetch additionally needs Claude Code installed, authenticated, and the spawn
+folder trusted. Everything except that fetch — the transcript panel, the derived charts, the
+history — works without it.
 
 ---
 
