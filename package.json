@@ -1,14 +1,20 @@
 {
   "name": "ccfuel",
   "version": "1.1.0",
-  "description": "Claude Token Usage Dashboard",
+  "description": "Fuel gauge for Claude Code — track the tokens that actually burn your weekly quota",
   "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node test/reset-cycle.test.js && node test/session-metrics.test.js && node test/session-scan.test.js"
+    "demo": "node scripts/demo.js",
+    "postinstall": "node scripts/fix-pty-permissions.js",
+    "test": "node test/reset-cycle.test.js && node test/session-metrics.test.js && node test/session-scan.test.js && node test/usage-parse.test.js && node test/pty-smoke.test.js && node test/server-smoke.test.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.22.2",
+    "node-pty": "^1.1.0"
   }
 }
