@@ -13,7 +13,8 @@ jobs:
     # has no prebuild and compiles from source. A Linux-only matrix stayed green through a
     # macOS-only failure that made every PTY fetch die with "posix_spawnp failed."
     #
-    # Node 22 and 24 are the declared support floor and ceiling (package.json `engines`).
+    # `engines` declares >=22, so 22 is the floor and there is no upper bound. 22 and 24 are the
+    # lines CI covers (active LTS lines); newer lines are expected to work and are not gated here.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -46,6 +47,7 @@ jobs:
           node --check scripts/synthetic-fixture.js
           node --check scripts/fix-pty-permissions.js
           node --check test/claims.test.js
+          node --check test/demo-entrypoint.test.js
 
       # Fails on any high/moderate advisory that has a fix available. Low severity is not a
       # release gate for a localhost dashboard with no untrusted input.

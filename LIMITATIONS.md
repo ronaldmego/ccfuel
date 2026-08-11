@@ -20,8 +20,13 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 ### Risks
 
 - **Fragile:** the whole read is screen-scraping a TUI. Claude CLI updates can change the
-  panel's wording or layout and break `parseUsageOutput()`. Timing changes no longer break it:
-  the fetch waits on the keystroke's echo and on the parse succeeding, not on fixed timers.
+  panel's wording or layout and break `parseUsageOutput()`. The two waits that used to break on
+  timing are event-driven now — the keystroke retries until its echo appears, and the fetch
+  resolves when the parse succeeds — but the fetch is not timer-free: a 4 s delay before the
+  first keystroke, a 1.5 s retry interval (which stops on the echo), a 400 ms pause after the
+  echo, a 2 s settle after the first good parse, and a 35 s hard timeout. Those are bounded
+  backstops and debounces rather than bets on how long the TUI needs, so a slower machine
+  degrades instead of failing.
 - **Costly per fetch:** ~6 s of process lifetime and ~327 MB RSS on the happy path — a whole
   CLI is booted to type one slash command. Zero tokens: `/usage` is local.
 - **One at a time:** Cannot run multiple PTY sessions simultaneously (Claude detects and rejects).

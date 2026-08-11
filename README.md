@@ -140,10 +140,15 @@ dashboard tells you which of the two it is — see [Troubleshooting](#troublesho
 npm run demo     # http://localhost:3401
 ```
 
-Builds a synthetic fixture in `demo-data/` and serves it with both collectors off — no PTY
-spawn, no transcript read — behind a "synthetic data" banner. Useful for screenshots, issue
-reports and demos. It is also the fixture the server smoke test runs against. It cannot show
-real usage, and it changes nothing about `node server.js`.
+Builds a synthetic fixture in a fresh temp directory and serves it with both collectors off —
+no PTY spawn, no transcript read — behind a "synthetic data" banner. Useful for screenshots,
+issue reports and demos.
+
+The fixture directory is created per run under the OS temp dir and removed when the demo exits.
+**`DASHBOARD_DATA_DIR` is deliberately ignored here**: the demo overwrites a fixed set of
+filenames, so honouring it would let `npm run demo` destroy the snapshots of anyone who had
+configured a real data directory. There is no flag to override that — looking at the UI does not
+need write access to real data.
 
 ### Optional: PM2 for background running
 
@@ -279,8 +284,13 @@ project, and two decisions keep it honest:
   types a slash command and never calls a tool, but a default spawn boots every MCP server
   the user has configured. On a host with Playwright MCP that was a second process of
   ~162 MB per fetch, for nothing.
-- **Every wait is event-driven.** Nothing waits on a fixed timer any more; see the history
-  below for why that mattered more than it sounds.
+- **The two waits that used to break it are now event-driven**: the keystroke is retried until
+  its echo appears on screen, and the fetch resolves when `parseUsageOutput()` succeeds — not
+  when a wording match or a fixed deadline says so. The remaining timers are deliberate and
+  bounded, not guesses about how long the TUI takes: a 4 s delay before the first keystroke, a
+  1.5 s retry interval that stops the moment the echo arrives, a 400 ms pause after the echo so
+  the autocomplete finishes drawing, a 2 s settle after the first successful parse, and the 35 s
+  hard timeout as a backstop. See the history below for why the difference matters.
 
 #### What it costs per fetch
 

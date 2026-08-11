@@ -7,7 +7,7 @@ Thanks for your interest in improving ccfuel! This is a small, focused project �
 - **Open an issue first** for anything beyond a small fix, so we can agree on the approach before you write code.
 - **Keep it lightweight.** ccfuel is intentionally a zero-build app with three runtime dependencies: Express; `node-pty`, because there is no non-interactive way to read `/usage`; and `chart.js`, served from `node_modules` rather than a CDN. Please don't introduce a framework, a build step or a fourth dependency without discussing it first.
 - **No remote resources in the dashboard.** `public/index.html` must not load anything off-origin — no CDN script, no webfont, no remote image. `SECURITY.md` promises the page makes no third-party calls, and `npm test` enforces it. Serve it from `node_modules` through a `/vendor/…` route instead, the way Chart.js is.
-- **Don't commit real usage data or secrets.** `data/`, `demo-data/` and `.env` are gitignored for a reason — keep them out of commits. Test fixtures must use invented project labels, never real transcript directory names. For screenshots, `npm run demo` serves synthetic data so you never have to publish your own numbers.
+- **Don't commit real usage data or secrets.** `data/` and `.env` are gitignored for a reason — keep them out of commits. Test fixtures must use invented project labels, never real transcript directory names. For screenshots, `npm run demo` serves synthetic data so you never have to publish your own numbers.
 - **English** for code, comments, and docs.
 
 ## Development setup
