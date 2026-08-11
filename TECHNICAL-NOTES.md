@@ -1,21 +1,32 @@
-# Notas Tecnicas: Medicion de Gasolina Real
+# Notas Tecnicas: cuota oficial y proxy de atribucion
 
-Este documento explica como el dashboard mide el consumo de tokens y por que ignoramos la mayoria del volumen reportado.
+Este documento explica de donde sale el porcentaje de cuota (de `/usage`, oficial) y como se
+calcula el proxy con el que ccfuel atribuye el trabajo no-cache (heuristica propia, no una
+formula de Anthropic). Son dos cosas distintas y no se mezclan.
 
 ---
 
 ## El Problema
 
-Claude Code tiene un limite semanal de tokens. Pero ~96% de los tokens reportados son **cacheReadTokens** — lecturas de cache que no consumen cuota real.
+Claude Code tiene un limite semanal. El CLI te dice **cuanto** queda si tipeas `/usage`, pero no
+te dice **en que** se fue. Y los contadores crudos de los transcripts locales estan dominados
+por lecturas de cache, asi que sumarlos no sirve para atribuir trabajo: en el corpus medido por
+el maintainer, ~96% del volumen de tokens son `cacheReadTokens` (ver "Alcance de la medicion").
 
 Si miras `totalTokens` directamente:
 - Los numeros se ven enormes (millones por dia)
-- No reflejan el gasto real de cuota
-- No sirven para saber si la gasolina te alcanza la semana
+- Estan dominados por contexto reusado, no por trabajo nuevo
+- No sirven para distinguir en que proyecto se concentro el trabajo
 
-## La Solucion: % Oficial via PTY
+## Dos cosas distintas, y la separacion es el diseño
 
-El dashboard obtiene el **porcentaje oficial** directamente de Claude Code via el comando `/usage` ejecutado en un PTY interactivo (`claude-usage.js`). Este % es la **unica fuente de verdad**.
+| | Fuente | Responde | Estatus |
+|---|---|---|---|
+| **Medidor oficial** | Claude `/usage` via PTY | **cuanto** de la cuota se fue | Autoritativo — el numero de Anthropic |
+| **Proxy local de fuel** | Los transcripts de sesion | **donde** se concentro el trabajo no-cache | Heuristica de ccfuel. No es una formula de Anthropic |
+
+El % de `/usage` es la **unica fuente de verdad para la cuota** (`claude-usage.js`). El proxy no
+se convierte a % nunca: son unidades distintas.
 
 ### Que mide Claude `/usage`
 
@@ -25,14 +36,31 @@ El dashboard obtiene el **porcentaje oficial** directamente de Claude Code via e
 | `weekAll.percent` | % de la cuota semanal usada (todas las fuentes: CLI, web, API) |
 | `weekSonnet.percent` | % semanal solo modelos Sonnet |
 
-### Que tokens consumen cuota
+### El proxy de fuel: que entra y por que
 
-| Tipo | Impacto en cuota |
+`fuel = output_tokens + input_tokens + cache_creation_input_tokens`
+
+| Contador | En el proxy | Por que |
 |------|------------------|
-| `outputTokens` | Alto — lo que Claude genera |
-| `inputTokens` | Medio — contexto nuevo |
-| `cacheCreationInputTokens` | Medio — primera escritura a cache |
-| `cacheReadInputTokens` | Ninguno — ~96% del volumen, gratis |
+| `outputTokens` | Si | Contenido generado — nunca viene de cache |
+| `inputTokens` | Si | Contexto no cacheado de ese turno |
+| `cacheCreationInputTokens` | Si | Escribir al cache es trabajo nuevo, y en la API se cobra *por encima* del input base |
+| `cacheReadInputTokens` | No | Contexto reusado. Domina el volumen crudo y tapa la señal |
+
+**Por que se excluyen las lecturas de cache, dicho con precision.** Reusar contexto cacheado
+tiene tratamiento favorable: la guia de limites de uso de Anthropic dice que el contenido
+cacheado de proyectos "doesn't count against your limits when reused" y que "only new/uncached
+portions count against your limits"; y en la API las lecturas de cache se cobran a **0.1x el
+precio del input base**, no a precio pleno. Es tratamiento favorable a tarifa reducida, y
+Anthropic **no publica** una formula que mapee los cuatro contadores de los transcripts de Claude
+Code al porcentaje semanal. El proxy las deja afuera por esas dos razones declaradas —
+tratamiento favorable y volumen dominante que tapa la señal — y no afirma nada sobre lo que
+Claude Code te cobra.
+
+Fuentes:
+
+- Precios de prompt caching (lecturas a 0.1x input base): <https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing>
+- Limites de uso y contenido cacheado: <https://support.claude.com/en/articles/9797557-usage-limit-best-practices>
 
 ### Metricas derivadas
 
@@ -51,7 +79,7 @@ Ver `computeUsageDeltas()` en `server.js`.
 
 ## Ciclo Semanal de Claude
 
-La semana de Claude **NO es lunes a domingo**. Es un ciclo rolling de 7 dias que se resetea a una hora especifica cada dia (ej: 10am Panama). La hora de reset viene del campo `weekAll.resetsAtHour` del output de `/usage`.
+La semana de Claude **NO es lunes a domingo**. Es un ciclo rolling de 7 dias que se resetea a una hora especifica cada dia (ej: 10am en el offset configurado). La hora de reset viene del campo `weekAll.resetsAtHour` del output de `/usage`.
 
 ### Calculo del ciclo
 
@@ -85,44 +113,47 @@ Si Claude dice "resets at 10am" y hoy es miercoles 11 feb a las 7pm:
 
 ---
 
-## Timezone: Panama (UTC-5)
+## Timezone: un offset fijo, configurable
 
-**Todo** el dashboard opera en hora Panama (UTC-5). Esto es critico porque las comparaciones de "hoy" y ciclo semanal deben ser consistentes.
+**Todo** el dashboard opera en un unico offset respecto de UTC. Esto es critico porque las
+comparaciones de "hoy" y el ciclo semanal deben ser consistentes entre capas. El valor sale de
+`DASHBOARD_TIMEZONE` y por defecto es `-5`; es un offset, no una timezone, asi que no hay DST.
 
 ### Patron centralizado
 
-Frontend (`index.html`):
-```javascript
-const PANAMA_OFFSET = -5;
-
-function getPanamaDate(date) {
-  const d = date || new Date();
-  return new Date(d.getTime() + (PANAMA_OFFSET * 3600000));
-}
-
-function getPanamaTodayISO() {
-  return getPanamaDate().toISOString().split('T')[0];
-}
-```
+Una sola fuente, tres consumidores. El backend lee la variable, el frontend la recibe por
+`/api/config`, y el parser de `/usage` la usa para interpretar la hora de reset que el panel
+imprime sin zona.
 
 Backend (`server.js`):
 ```javascript
-const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
-const panama = new Date(panamaMs);
+const TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
+const shifted = new Date(now.getTime() + (TZ_OFFSET * 3600000));
 ```
+
+Frontend (`index.html`):
+```javascript
+let TZ_OFFSET = -5;  // default, sobreescrito por /api/config
+fetch('/api/config').then(r => r.json()).then(cfg => {
+  if (cfg.tzOffset != null) TZ_OFFSET = cfg.tzOffset;
+});
+```
+
+Parser (`claude-usage.js`): `parseUsageOutput(output, tzOffset)` recibe el offset como
+argumento — inyectable, por eso los tests son deterministas donde sea que corran.
 
 ### Regla clave: usar metodos UTC
 
-Cuando se trabaja con el Date panama-shifted, **siempre usar metodos UTC** (`getUTCDate()`, `setUTCHours()`, `getUTCDay()`, etc). Nunca usar metodos locales (`getDate()`, `setHours()`, `getDay()`), porque estos dependen del timezone del browser o del servidor, y el Date ya esta shifted a Panama.
+Cuando se trabaja con el Date ya desplazado al offset, **siempre usar metodos UTC** (`getUTCDate()`, `setUTCHours()`, `getUTCDay()`, etc). Nunca usar metodos locales (`getDate()`, `setHours()`, `getDay()`), porque estos dependen del timezone del browser o del servidor, y el Date ya esta desplazado.
 
 ### Bug corregido: getTimezoneOffset
 
-El frontend originalmente usaba `now.getTimezoneOffset()` para calcular Panama time:
+El frontend originalmente usaba `now.getTimezoneOffset()` para calcular la hora local:
 
 ```javascript
 // BUG: depende del timezone del browser
 const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-const panamaMs = utcMs + (-5 * 60) * 60000;
+const localMs = utcMs + (-5 * 60) * 60000;
 ```
 
 Esto solo funciona si el browser esta en un timezone con offset consistente. Si el browser esta en UTC, `getTimezoneOffset()` es 0 y el calculo es correcto. Pero si esta en otro timezone con DST, el offset cambia y los calculos fallan.
@@ -131,12 +162,11 @@ La solucion es usar **offset directo desde UTC** sin pasar por el timezone del b
 
 ```javascript
 // CORRECTO: directo desde UTC, sin depender del browser
-const panamaMs = new Date().getTime() + (PANAMA_OFFSET * 3600000);
+const localMs = new Date().getTime() + (TZ_OFFSET * 3600000);
 ```
 
 Funciones afectadas y corregidas:
 - `getWeekCycleInfo()` — ciclo semanal, pace, reset countdown
-- `getBillingCycleDates()` — ciclo de facturacion mensual
 - `updatePace()` — fecha de agotamiento proyectada
 - Formato de fechas — cambiado de `toLocaleDateString()` a formato manual con `getUTCDate()/getUTCMonth()`
 
@@ -144,13 +174,12 @@ Funciones afectadas y corregidas:
 
 ## Ventanas de Tiempo
 
-El dashboard opera con 3 ventanas de tiempo distintas. Cada metrica usa una sola ventana y **no deben mezclarse**.
+El dashboard opera con 2 ventanas de tiempo distintas. Cada metrica usa una sola ventana y **no deben mezclarse**.
 
 | Ventana | Rango | Metricas que la usan |
 |---------|-------|---------------------|
-| **Ciclo semanal** | 7 dias rolling, reset a hora especifica (ej: 10am) | Gauges (sesion/semanal), pace, heatmap, comparacion semanal |
-| **Ciclo facturacion** | Mensual (ej: 2 feb → 2 mar) | Dias restantes, Tokens Ciclo (tab Eficiencia) |
-| **Calendario** | Ultimos 14 dias (medianoche a medianoche) | Chart "Consumo Tokens por Dia", chart "Tokens por Franja Horaria" |
+| **Ciclo semanal** | 7 dias rolling, reset a hora especifica (ej: 10am) | Gauges (sesion/semanal), pace, heatmap, comparacion semanal, "What burned it" con `window=cycle` |
+| **Calendario** | Ultimos 14 dias / 48h (cortes al offset configurado) | Charts "Daily consumption" y "Hourly consumption" |
 
 ### Por que no coinciden los numeros entre charts
 
@@ -197,7 +226,7 @@ El `weekId` es la fecha de inicio del ciclo (no el dia de la semana tradicional)
 
 ---
 
-## Tab Patrones: Curvas de % y Heatmap
+## Curvas de % y Heatmap
 
 ### Heatmap de Intensidad (CSS Grid)
 
@@ -219,7 +248,9 @@ Datos de `curves` en `/api/usage-deltas`, derivados de snapshots en `data/usage-
 
 Archivo `data/usage-curve.json` con snapshots periodicos del % global.
 
-**Trigger:** Cada fetch exitoso de `/api/global-usage` (cada ~5 min). Despues de `saveWeeklySnapshot()`.
+**Trigger:** Cada fetch exitoso de `/api/global-usage`. La cadencia la fija el auto-collector
+(`DASHBOARD_COLLECT_INTERVAL_MIN`, 20 min por defecto); un request HTTP puede adelantarlo, con
+cache de 5 min. Despues de `saveWeeklySnapshot()`.
 
 **Estructura por snapshot:**
 ```json
@@ -251,6 +282,23 @@ El % de Claude `/usage` es **account-level** — incluye todo el consumo indepen
 | Cursor, Continue, etc. | Si | Si usan la misma cuenta |
 
 Esta es la ventaja principal del enfoque PTY: el % oficial ya incluye todo, sin necesidad de parsear logs individuales.
+
+---
+
+## Alcance de la medicion
+
+Los numeros de este documento salen de **un corpus propio**, no de una fuente publicada:
+
+| Observacion | Corpus |
+|---|---|
+| ~96% del volumen de tokens son lecturas de cache | 1.778 sesiones reales, una sola maquina |
+| El corte de 10.000 tokens descarta 63% de los archivos y retiene 99,95% del fuel | el mismo corpus |
+| Sumar filas en vez de deduplicar por `message.id` inflaba 2,6x | 45.354 filas con `usage` vs 21.351 ids unicos |
+
+Son observaciones de ese corpus, no constantes universales: dependen de como trabaja quien lo
+midio (tamaño de contexto, cuantos turnos por sesion, cuanto reuso de cache). Nada en el codigo
+depende de esas cifras — el corte de fuel es configurable y el resto son descriptivos. Si medis
+tu propio corpus, esperá numeros distintos.
 
 ---
 

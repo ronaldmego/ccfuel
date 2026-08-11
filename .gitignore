@@ -1,5 +1,7 @@
 node_modules/
 data/
+# Legacy: the demo now writes to a temp dir. Kept so an old demo-data/ stays ignored.
+demo-data/
 .env
 *.log
 *.png

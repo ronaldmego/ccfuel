@@ -5,8 +5,9 @@ Thanks for your interest in improving ccfuel! This is a small, focused project �
 ## Ground rules
 
 - **Open an issue first** for anything beyond a small fix, so we can agree on the approach before you write code.
-- **Keep it lightweight.** ccfuel is intentionally a zero-build, single-dependency app (Express). Please don't introduce a framework or a build step without discussing it first.
-- **Don't commit real usage data or secrets.** `data/` and `.env` are gitignored for a reason — keep them out of commits. Screenshots in `screenshots/` should not reveal anything you wouldn't want public.
+- **Keep it lightweight.** ccfuel is intentionally a zero-build app with three runtime dependencies: Express; `node-pty`, because there is no non-interactive way to read `/usage`; and `chart.js`, served from `node_modules` rather than a CDN. Please don't introduce a framework, a build step or a fourth dependency without discussing it first.
+- **No remote resources in the dashboard.** `public/index.html` must not load anything off-origin — no CDN script, no webfont, no remote image. `SECURITY.md` promises the page makes no third-party calls, and `npm test` enforces it. Serve it from `node_modules` through a `/vendor/…` route instead, the way Chart.js is.
+- **Don't commit real usage data or secrets.** `data/` and `.env` are gitignored for a reason — keep them out of commits. Test fixtures must use invented project labels, never real transcript directory names. For screenshots, `npm run demo` serves synthetic data so you never have to publish your own numbers.
 - **English** for code, comments, and docs.
 
 ## Development setup
@@ -14,9 +15,15 @@ Thanks for your interest in improving ccfuel! This is a small, focused project �
 ```bash
 git clone https://github.com/ronaldmego/ccfuel.git
 cd ccfuel
-npm install
+npm ci
+npm test         # includes a PTY spawn check and a real server boot
 node server.js   # http://localhost:3400
+npm run demo     # http://localhost:3401 — synthetic data, for screenshots
 ```
+
+Node 22+ (see `engines`). If the gauge stays empty on first run, Claude Code is probably asking
+to trust the folder — `/api/global-usage` will say so in `failureKind`. See the Troubleshooting
+section of the README.
 
 The most fragile part is `claude-usage.js` (the PTY wrapper that drives Claude Code's `/usage`). Before touching it, run:
 
@@ -29,7 +36,7 @@ See `TECHNICAL-NOTES.md` for how measurement works and `LIMITATIONS.md` for know
 ## Pull requests
 
 1. Branch from `main`: `git checkout -b fix/short-description`
-2. Make the change; test it runs from a clean `npm install`.
+2. Make the change, then verify it from a clean clone: `npm ci && npm test && node server.js`. CI runs the same on Linux and macOS, Node 22 and 24.
 3. Update `CHANGELOG.md` under `[Unreleased]`.
 4. Open the PR with a clear description of the problem and the fix.
 

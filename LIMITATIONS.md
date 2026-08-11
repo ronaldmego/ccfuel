@@ -19,16 +19,36 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 
 ### Risks
 
-- **Fragile:** PTY timing is empirical (4s init, 1.5s autocomplete wait). Claude CLI updates can break it.
-- **Slow:** Each fetch takes ~20-25 seconds (spawn, init, command, parse, kill).
+- **Fragile:** the whole read is screen-scraping a TUI. Claude CLI updates can change the
+  panel's wording or layout and break `parseUsageOutput()`. The two waits that used to break on
+  timing are event-driven now — the keystroke retries until its echo appears, and the fetch
+  resolves when the parse succeeds — but the fetch is not timer-free: a 4 s delay before the
+  first keystroke, a 1.5 s retry interval (which stops on the echo), a 400 ms pause after the
+  echo, a 2 s settle after the first good parse, and a 35 s hard timeout. Those are bounded
+  backstops and debounces rather than bets on how long the TUI needs, so a slower machine
+  degrades instead of failing.
+- **Costly per fetch:** ~6 s of process lifetime and ~327 MB RSS on the happy path — a whole
+  CLI is booted to type one slash command. Zero tokens: `/usage` is local.
 - **One at a time:** Cannot run multiple PTY sessions simultaneously (Claude detects and rejects).
-- **Env-sensitive:** Must filter `CLAUDECODE` env var or Claude refuses to start.
+- **Env-sensitive:** all `CLAUDE*` env vars must be filtered or Claude refuses to start
+  (nested-session detection).
+- **Folder trust:** Claude Code trusts folders individually, and its trust prompt swallows the
+  keystrokes. A fresh clone is by definition an untrusted folder, so on first run every fetch
+  fails until the folder is accepted or `DASHBOARD_CLAUDE_CWD` points somewhere already
+  trusted. ccfuel detects this state and reports it; it never answers the prompt.
+- **Native module, macOS packaging:** node-pty 1.1.0 publishes its macOS prebuild with a
+  non-executable `spawn-helper`, and every spawn then fails with `posix_spawnp failed.`
+  regardless of Node version. Repaired by a `postinstall`
+  (`scripts/fix-pty-permissions.js`); it will be removable once upstream ships the bit.
 
 ### Mitigation
 
 - 5-minute cache on successful fetches (avoids hammering PTY)
-- 35-second timeout with graceful fallback
+- 35-second timeout with graceful fallback, plus one retry inside the same collector cycle
 - **A failed/timed-out fetch keeps the last good cached value** — a transient PTY timeout never overwrites real usage with `0%` (see Historical bug below)
+- Failures are named, not generic: `failureKind` is one of `trust-prompt`, `login-required`,
+  `timeout`, `exited-early`. The first two are detected during boot and end the fetch
+  immediately instead of spending the full 35 s on a state no retry can clear.
 - Debug mode: `node claude-usage.js --debug` writes raw output to `/tmp/claude-usage-debug.log`
 
 ### Historical bug: transient PTY timeout read as 0% (#34)
@@ -43,22 +63,34 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 
 ---
 
-## Timezone: Hardcoded UTC-5
+## Timezone: one fixed offset, no DST
 
-The dashboard assumes **Panama (UTC-5)** as a fixed timezone. It does not use DST or detect the user's timezone.
+The dashboard works in a **single UTC offset**, set by `DASHBOARD_TIMEZONE` and defaulting to
+`-5`. It never reads the browser's or the host's zone, and it has no DST handling — an offset,
+not a timezone. In a DST region the derived day boundaries drift by an hour for part of the year.
 
 | Aspect | Status |
 |--------|--------|
-| Weekly reset time | Interpreted as Panama time |
-| "Spent Today" | Day calculated in Panama time |
-| Hourly charts | Blocks grouped by Panama hour |
-| Browser in other timezone | No impact — does not depend on browser timezone |
+| Weekly reset time | The `/usage` panel prints wall-clock with no zone; interpreted at the configured offset |
+| Day boundaries ("spent today") | Cut at the configured offset |
+| Hourly charts and heatmap | Bucketed by hour at the configured offset |
+| Browser in another timezone | No impact — the frontend takes the offset from `/api/config` |
+| DST | Not handled |
 
-To use a different timezone, update `PANAMA_OFFSET` in `index.html` and the equivalent in `server.js`. See `TECHNICAL-NOTES.md` Timezone section for details.
+One setting covers all three layers: the server, the frontend (via `/api/config`) and the
+`/usage` reset parser.
+
+### Known edge: reset dates near the year boundary
+
+The panel prints dated resets without a year (`Aug 18, 10am`), so the parser assumes the
+current one. For the few days each year when the next reset falls after 31 December, that
+yields a date in the past, which the parser discards rather than trusting. The effect is
+bounded — the cycle keeps running off the persisted reset anchor and the `resetsAtHour`
+fallback — but the dated reset is unavailable during that window.
 
 ### Historical bug: getTimezoneOffset
 
-Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to calculate Panama time. This made calculations depend on the browser's timezone and produced incorrect results if the browser was not in UTC. Fixed by using direct offset from UTC.
+Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to derive local time. This made calculations depend on the browser's timezone and produced incorrect results if the browser was not in UTC. Fixed by using the configured offset directly from UTC.
 
 ---
 
@@ -79,14 +111,32 @@ Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to 
 The "What burned it" panel has a **different source** from every other metric: the local JSONL
 transcripts under `~/.claude/projects`, not `/usage`. That brings its own limits.
 
-- **Tokens ≠ quota %.** Converting token counts into a quota percentage needs Anthropic's private
-  weighting, so the panel reports **shares** ("this project took 60% of the tokens you burned"),
-  never "this session used N% of your week". The two numbers are not comparable.
+- **It is a proxy, not an official measurement.** `fuel = output + input + cache_creation` is
+  **ccfuel's own heuristic** for attributing non-cache work, not a published Anthropic formula.
+  Anthropic does not publish any mapping from Claude Code's four transcript counters onto the
+  weekly quota percentage, so nothing here should be read as "this is what Claude Code charges
+  you". The authoritative number is the `/usage` gauge, and only that.
+- **Why cache reads are left out, precisely.** Reusing cached context is treated favorably:
+  Anthropic's usage-limit guidance states that cached project content "doesn't count against
+  your limits when reused" and that "only new/uncached portions count against your limits", and
+  on the API cache reads are billed at **0.1× the base input token price** rather than full
+  price ([caching pricing](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing),
+  [usage limits](https://support.claude.com/en/articles/9797557-usage-limit-best-practices)).
+  That is favorable treatment at a reduced rate. The proxy excludes them for two stated reasons —
+  that favorable treatment, and reused context dominating raw volume and burying the attribution
+  signal. It makes no claim about what Claude Code charges.
+- **Tokens ≠ quota %.** Converting proxy tokens into a quota percentage would need Anthropic's
+  private weighting, so the panel reports **shares** ("this project took 60% of the non-cache
+  tokens in the window"), never "this session used N% of your week". The two are different units
+  and are never converted.
 - **The counters are disjoint, not nested.** `input_tokens`, `cache_creation_input_tokens`,
-  `cache_read_input_tokens` and `output_tokens` are separate totals. Fuel is therefore a **sum**
-  of what burns quota (`output + input + cache_creation`) and excludes cache reads — which are
-  ~96% of all tokens. Subtracting cache reads from input, as if they were a subset, produces
-  negative fuel (measured at `-9.45e9` across 1778 sessions, negative in 40% of them).
+  `cache_read_input_tokens` and `output_tokens` are separate totals. The proxy is therefore a
+  **sum** of its three terms, not `input - cache_read`: subtracting them as if cache reads were a
+  subset of input produces negative fuel (measured at `-9.45e9` across 1778 sessions, negative in
+  40% of them).
+- **The ~96% figure is an observation, not a constant.** Cache reads were ~96% of token volume
+  across the maintainer's own 1778-session corpus on one machine. It will differ with how you
+  work, and nothing in the code depends on it.
 - **One message, many rows.** A message is written to the transcript repeatedly while it
   streams, each row a fuller snapshot under the same `message.id`. Fuel and turns count each
   `message.id` **once** — the last snapshot, taken as a whole row, never a field-wise merge.
@@ -107,11 +157,33 @@ transcripts under `~/.claude/projects`, not `/usage`. That brings its own limits
 
 ---
 
+---
+
+## Platform support
+
+Declared support is what is actually exercised, not what might work.
+
+| | Status |
+|---|---|
+| Node.js | **22+** (`engines`). CI runs 22 and 24; 25 verified by hand. Older lines are EOL and untested |
+| macOS | Supported. Verified end-to-end on macOS 26 / arm64 with Node 22, 24 and 25 |
+| Linux | Supported. The deploy target; needs a C++ toolchain since node-pty has no Linux prebuild |
+| Windows | **Untested.** node-pty ships a Windows prebuild and nothing in the code is POSIX-only, but no one has run it. Reports welcome |
+
+The `/usage` fetch additionally needs Claude Code installed, authenticated, and the spawn
+folder trusted. Everything except that fetch — the transcript panel, the derived charts, the
+history — works without it.
+
+---
+
 ## References
 
 - PTY implementation: `claude-usage.js`
 - Per-session fuel collector: `session-metrics.js`
 - Timezone details: `TECHNICAL-NOTES.md`
+- Claim contract check: `test/claims.test.js`
+- Prompt caching pricing: https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing
+- Usage limits and cached content: https://support.claude.com/en/articles/9797557-usage-limit-best-practices
 - Anthropic Console: https://console.anthropic.com
 
 ---

@@ -5,10 +5,22 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ccfuel · Fuel gauge for Claude Code</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!--
+    NO REMOTE RESOURCES. Every asset this page loads is served by ccfuel itself.
+
+    This used to pull IBM Plex from fonts.googleapis.com/fonts.gstatic.com and Chart.js from
+    cdn.jsdelivr.net, which made SECURITY.md's promise of "no third-party calls beyond running
+    your local claude binary" false: opening the dashboard announced itself to two CDNs on every
+    load. The Chart.js tag was also unpinned (`npm/chart.js`), so the page executed whatever the
+    CDN happened to be serving that day.
+
+    Chart.js now comes from the npm dependency, served at /vendor/chart.umd.js straight out of
+    node_modules — version-pinned in package-lock.json, no minified blob committed here. The font
+    stacks below keep their named families and fall through to system fonts; nothing is fetched.
+
+    Enforced by test/claims.test.js (static scan) and test/server-smoke.test.js (route + runtime).
+  -->
+  <script src="/vendor/chart.umd.js"></script>
   <style>
     :root {
       --bg: #eef1f6;
@@ -322,9 +334,38 @@
     /* Footer */
     .footer { text-align: center; padding: 20px; color: var(--ink-3); font-size: 0.78em; border-top: 1px solid var(--border); margin-top: 24px; }
     .footer span { font-family: var(--mono); color: var(--ink-2); }
+    /* Capture mode (DASHBOARD_DEMO=1). Hidden unless /api/config reports demo: true, so it
+       can never appear over real data.
+
+       Sticky on purpose: a banner that scrolls away lets a screenshot of a panel further down
+       the page look like production. Pinned, every capture and every second of a screen
+       recording carries the marker, wherever the viewer has scrolled to.
+
+       `.header` is also sticky at top:0 with z-index 100, so the two would collide and the
+       header would win. In demo mode the header is pushed down by the banner's measured height
+       (set as --demo-banner-h when the banner is unhidden) and the banner sits above it.
+       Normal mode is untouched: the banner stays hidden and the header keeps top:0. */
+    .demo-banner {
+      position: sticky;
+      top: 0;
+      z-index: 110;
+      background: #b45309;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 7px 12px;
+    }
+    body.demo .header { top: var(--demo-banner-h, 29px); }
   </style>
 </head>
 <body>
+  <div id="demo-banner" class="demo-banner" hidden>
+    Demo mode — synthetic data. Not real usage.
+  </div>
+
   <!-- Header -->
   <header class="header">
     <div class="brand">
@@ -510,7 +551,7 @@
           <span class="section-title">What burned it</span>
           <span class="section-meta" id="fuel-meta"></span>
         </div>
-        <div class="section-sub">Fuel by project and heaviest sessions — from local transcripts, not /usage</div>
+        <div class="section-sub">Where the non-cache work concentrated — local fuel <em>proxy</em> from transcripts, not the official /usage quota</div>
         <div class="fuel-pills" id="fuel-window-pills">
           <button class="fuel-pill active" data-window="cycle">Current cycle</button>
           <button class="fuel-pill" data-window="28d">Last 28 days</button>
@@ -1748,9 +1789,11 @@
         const hidden = d.totals.sessionsBelowCut
           ? ` ${d.totals.sessionsBelowCut} session(s) under the ${formatNumber(d.minFuel)}-token cut hidden (${formatNumber(d.totals.belowCutFuel)} tokens, ${d.totals.fuel ? (100 * d.totals.belowCutFuel / (d.totals.fuel + d.totals.belowCutFuel)).toFixed(1) : 0}%).`
           : '';
-        noteEl.textContent = 'Fuel = output + input + cache creation. Cache reads are excluded — '
-          + 'they are ~96% of all tokens and do not burn quota. Tokens are not the same unit as '
-          + 'the /usage percentage, so treat these as shares, not quota.' + hidden;
+        noteEl.textContent = 'Fuel proxy = output + input + cache creation — ccfuel\'s own '
+          + 'heuristic for attributing non-cache work, not an Anthropic formula. Cache reads are '
+          + 'excluded because reused context dominates raw volume (~96% in the maintainer\'s '
+          + 'corpus) and buries the signal. Proxy tokens are a different unit from the /usage '
+          + 'percentage, so these are shares of the proxy, never quota.' + hidden;
       } catch (e) {
         projEl.innerHTML = '<div class="fuel-empty">Failed to load</div>';
         tbody.innerHTML = '<tr><td colspan="5" class="fuel-empty">Failed to load</td></tr>';
@@ -1768,6 +1811,15 @@
 
     fetch('/api/config').then(r => r.json()).then(cfg => {
       if (cfg.tzOffset != null) TZ_OFFSET = cfg.tzOffset;
+      if (cfg.demo) {
+        const banner = document.getElementById('demo-banner');
+        banner.hidden = false;
+        // Measure rather than hardcode: the offset has to match whatever the banner actually
+        // renders at, or the sticky header overlaps it as you scroll.
+        document.body.classList.add('demo');
+        document.body.style.setProperty('--demo-banner-h', banner.offsetHeight + 'px');
+        document.title = 'DEMO · ' + document.title;
+      }
     }).catch(() => {}).finally(() => {
       Promise.all([loadWeeklyHistory(), loadConsumoTab()]).then(() => {
         loadGlobalUsage();

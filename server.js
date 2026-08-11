@@ -10,17 +10,44 @@ const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3400;
 const HOST = process.env.DASHBOARD_HOST || '127.0.0.1';
 const TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
+
+// Capture/smoke mode. Serves whatever is already in DATA_DIR and collects nothing: no PTY
+// spawn, no transcript read. It exists so the UI can be screenshotted and so the server
+// smoke test is deterministic — never to make the normal mode show invented numbers. The
+// flag is echoed by /api/config and the dashboard paints a banner, so a capture taken in
+// this mode cannot be mistaken for production data.
+const DEMO = process.env.DASHBOARD_DEMO === '1';
+
+// Snapshots live outside the code tree so a capture run, a test and the real dashboard can
+// each keep their own. Created on boot: a fresh clone has no `data/`, and every writer here
+// used to fail with ENOENT until someone made the directory by hand.
+const DATA_DIR = process.env.DASHBOARD_DATA_DIR
+  ? path.resolve(process.env.DASHBOARD_DATA_DIR)
+  : path.join(__dirname, 'data');
+try {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch (e) {
+  console.error(`❌ Cannot create data directory ${DATA_DIR}: ${e.message}`);
+  process.exit(1);
+}
+
 // Auto-collector cadence (minutes). 0 disables the in-process scheduler.
-const COLLECT_INTERVAL_MIN = parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '20', 10);
-const WEEKLY_HISTORY_FILE = path.join(__dirname, 'data', 'weekly-history.json');
-const USAGE_CURVE_FILE = path.join(__dirname, 'data', 'usage-curve.json');
+const COLLECT_INTERVAL_MIN = DEMO
+  ? 0
+  : parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '20', 10);
+const WEEKLY_HISTORY_FILE = path.join(DATA_DIR, 'weekly-history.json');
+const USAGE_CURVE_FILE = path.join(DATA_DIR, 'usage-curve.json');
+// Only read in demo mode, where there is no PTY to produce a live gauge.
+const GLOBAL_USAGE_FILE = path.join(DATA_DIR, 'global-usage.json');
 
 // Per-session fuel from local transcripts (#39). Independent of the /usage collector:
 // different source, different cadence, and it must never block a PTY fetch.
-const SESSION_METRICS_FILE = path.join(__dirname, 'data', 'session-metrics.json');
+const SESSION_METRICS_FILE = path.join(DATA_DIR, 'session-metrics.json');
 const TRANSCRIPTS_ROOT = process.env.DASHBOARD_TRANSCRIPTS_ROOT
   || path.join(require('os').homedir(), '.claude', 'projects');
-const SESSION_SCAN_INTERVAL_MIN = parseInt(process.env.DASHBOARD_SESSION_SCAN_INTERVAL_MIN || '30', 10);
+const SESSION_SCAN_INTERVAL_MIN = DEMO
+  ? 0
+  : parseInt(process.env.DASHBOARD_SESSION_SCAN_INTERVAL_MIN || '30', 10);
 const SESSION_MIN_FUEL = parseInt(
   process.env.DASHBOARD_SESSION_MIN_FUEL || String(sessionMetrics.DEFAULT_MIN_FUEL), 10);
 
@@ -33,7 +60,7 @@ let globalUsageCache = {
 
 // Persisted reset dates — PTY parsing is unreliable, so we keep the last
 // successfully parsed resetsAt values and reuse them when parsing fails.
-const RESETS_CACHE_FILE = path.join(__dirname, 'data', 'resets-cache.json');
+const RESETS_CACHE_FILE = path.join(DATA_DIR, 'resets-cache.json');
 let persistedResets = { session: null, weekAll: null, weekSonnet: null };
 try {
   if (fs.existsSync(RESETS_CACHE_FILE)) {
@@ -520,6 +547,32 @@ app.use(express.json({ limit: '10mb' }));
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Chart.js, served from the npm dependency instead of a CDN. The dashboard used to load it from
+// cdn.jsdelivr.net — unpinned — which contradicted SECURITY.md's "no third-party calls" and let a
+// third party decide what code ran in the page. Version comes from package-lock.json; no minified
+// blob is committed to the repo.
+//
+// The path is resolved off the package entry because chart.js 4's `exports` map refuses deep
+// subpath requires (`chart.js/dist/chart.umd.js` and even `chart.js/package.json` throw
+// ERR_PACKAGE_PATH_NOT_EXPORTED), so require.resolve cannot reach the UMD build directly.
+const CHART_UMD = (() => {
+  try {
+    return path.join(path.dirname(require.resolve('chart.js')), 'chart.umd.js');
+  } catch (e) {
+    return null;
+  }
+})();
+
+app.get('/vendor/chart.umd.js', (req, res) => {
+  if (!CHART_UMD || !fs.existsSync(CHART_UMD)) {
+    // Every chart on the page is dead without this, so say so plainly rather than 404.
+    return res.status(503)
+      .type('text/plain')
+      .send('chart.js is not installed — run `npm ci`. The dashboard renders no charts without it.');
+  }
+  res.type('application/javascript').sendFile(CHART_UMD);
+});
+
 // API endpoints
 
 app.get('/api/refresh', (req, res) => {
@@ -528,6 +581,20 @@ app.get('/api/refresh', (req, res) => {
 
 // Global Usage API (Claude /usage via PTY)
 app.get('/api/global-usage', async (req, res) => {
+  // Capture mode: serve the fixture on disk and never spawn a PTY. Flagged in the payload
+  // so no consumer — the dashboard included — can read it as a live gauge.
+  if (DEMO) {
+    if (!globalUsageCache.data) {
+      return res.status(503).json({
+        success: false,
+        demo: true,
+        failureKind: 'demo-fixture-missing',
+        error: `Demo mode is on but ${path.basename(GLOBAL_USAGE_FILE)} is not in ${DATA_DIR}`
+      });
+    }
+    return res.json({ ...globalUsageCache.data, demo: true, cached: true });
+  }
+
   // Return cached if fresh (less than 5 minutes old)
   const cacheAge = globalUsageCache.lastUpdate 
     ? (Date.now() - new Date(globalUsageCache.lastUpdate).getTime()) / 1000 / 60
@@ -575,7 +642,7 @@ app.get('/api/global-usage', async (req, res) => {
 
 app.get('/api/global-usage/refresh', async (req, res) => {
   // Force refresh global usage
-  globalUsageCache.lastUpdate = null;
+  if (!DEMO) globalUsageCache.lastUpdate = null;
   res.redirect('/api/global-usage');
 });
 
@@ -611,7 +678,7 @@ app.get('/api/usage-deltas', (req, res) => {
 
 // Config API (expose settings to frontend)
 app.get('/api/config', (req, res) => {
-  res.json({ tzOffset: TZ_OFFSET });
+  res.json({ tzOffset: TZ_OFFSET, demo: DEMO });
 });
 
 // Weekly History API — enriched with "time to 100%" from curve snapshots
@@ -731,6 +798,11 @@ app.get('/api/session-metrics', (req, res) => {
 });
 
 app.get('/api/session-metrics/refresh', async (req, res) => {
+  // Capture mode never reads transcripts, not even on demand: the fixture is the whole
+  // dataset, and a rescan here would pull in real sessions behind the demo banner.
+  if (DEMO) {
+    return res.json({ ok: false, demo: true, reason: 'transcript scanning is off in demo mode' });
+  }
   await scanSessionMetrics();
   res.json({ ok: true, updatedAt: sessionMetricsState.updatedAt, scan: sessionMetricsState.scan });
 });
@@ -822,9 +894,33 @@ async function scheduledCollect() {
   }
 }
 
+// Capture mode has no live source, so the gauge comes from a fixture written to DATA_DIR
+// beforehand (see scripts/demo.js). Loaded once at boot; nothing refreshes it.
+if (DEMO) {
+  try {
+    if (fs.existsSync(GLOBAL_USAGE_FILE)) {
+      globalUsageCache.data = JSON.parse(fs.readFileSync(GLOBAL_USAGE_FILE, 'utf8'));
+      globalUsageCache.lastUpdate = new Date().toISOString();
+    }
+  } catch (e) {
+    console.error(`❌ Demo fixture ${GLOBAL_USAGE_FILE} is unreadable: ${e.message}`);
+  }
+}
+
 // Start server
 app.listen(PORT, HOST, () => {
-  console.log(`🚀 Token Dashboard running at http://${HOST}:${PORT}`);
+  console.log(`🚀 ccfuel running at http://${HOST}:${PORT}`);
+  console.log(`💾 Data directory: ${DATA_DIR}`);
+
+  // Loud at boot rather than as four blank canvases in the browser.
+  if (!CHART_UMD || !fs.existsSync(CHART_UMD)) {
+    console.warn('⚠️  chart.js not found in node_modules — /vendor/chart.umd.js will 503 and no '
+      + 'chart will render. Run `npm ci`.');
+  }
+
+  if (DEMO) {
+    console.log('🎬 DEMO MODE — serving synthetic fixtures. No PTY spawn, no transcript read.');
+  }
 
   if (COLLECT_INTERVAL_MIN > 0) {
     console.log(`📡 Auto-collector enabled: every ${COLLECT_INTERVAL_MIN} min (set DASHBOARD_COLLECT_INTERVAL_MIN=0 to disable)`);

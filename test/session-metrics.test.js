@@ -7,7 +7,8 @@ const { turnFuel, projectLabel, aggregate, DEFAULT_MIN_FUEL } = require('../sess
 const cases = [];
 const test = (name, fn) => cases.push([name, fn]);
 
-// --- fuel formula -----------------------------------------------------------------
+// --- fuel proxy -------------------------------------------------------------------
+// `fuel` is ccfuel's attribution proxy, not an official quota figure (see session-metrics.js).
 // The four counters are disjoint. The bug this guards against is treating cache reads as
 // a subset of input_tokens and subtracting them, which goes negative on real data.
 const realTurn = {
@@ -17,13 +18,13 @@ const realTurn = {
   cache_read_input_tokens: 14170955
 };
 
-test('fuel sums what burns quota and ignores cache reads', () =>
+test('the proxy sums its three terms and ignores cache reads', () =>
   turnFuel(realTurn) === 184 + 168165 + 446496);
 
 test('fuel is never negative when cache reads dominate', () =>
   turnFuel(realTurn) > 0);
 
-test('a cache-read-only turn burns nothing', () =>
+test('a cache-read-only turn contributes nothing to the proxy', () =>
   turnFuel({ input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 9000000 }) === 0);
 
 test('missing counters are treated as zero', () =>
@@ -33,20 +34,22 @@ test('a missing usage block is zero, not a crash', () =>
   turnFuel(null) === 0 && turnFuel(undefined) === 0);
 
 // --- project labels ---------------------------------------------------------------
+// Slugs here are placeholders. A transcript directory name carries the user's real home path
+// and project names, so fixtures in a public repo use invented ones.
 test('strips the linux home prefix', () =>
-  projectLabel('-home-adminmgo-projects-athena') === 'athena');
+  projectLabel('-home-user-projects-alpha') === 'alpha');
 
 test('strips the macOS home prefix', () =>
-  projectLabel('-Users-ronald-projects-ccfuel') === 'ccfuel');
+  projectLabel('-Users-user-projects-ccfuel') === 'ccfuel');
 
 test('keeps nesting below projects/', () =>
-  projectLabel('-home-adminmgo-projects-products-titanvision') === 'products-titanvision');
+  projectLabel('-home-user-projects-products-beta') === 'products-beta');
 
 test('leaves a non-home path readable', () =>
   projectLabel('-tmp-scratch-eval') === 'tmp-scratch-eval');
 
 test('the home directory itself is labelled', () =>
-  projectLabel('-home-adminmgo') === 'home');
+  projectLabel('-home-user') === 'home');
 
 test('an empty slug does not blow up', () =>
   projectLabel('') === 'unknown' && projectLabel(null) === 'unknown');
@@ -59,11 +62,11 @@ const s = (id, label, end, fuel, hours = 1, turns = 10) =>
   ({ id, label, project: label, start: end, end, fuel, hours, turns });
 
 const sessions = [
-  s('a', 'athena', '2026-08-05T10:00:00Z', 300000),
-  s('b', 'athena', '2026-08-05T12:00:00Z', 100000),
+  s('a', 'alpha', '2026-08-05T10:00:00Z', 300000),
+  s('b', 'alpha', '2026-08-05T12:00:00Z', 100000),
   s('c', 'ccfuel', '2026-08-05T13:00:00Z', 100000),
   s('noise', 'ccfuel', '2026-08-05T14:00:00Z', 500),      // under the cut
-  s('old', 'athena', '2026-07-01T10:00:00Z', 900000)      // before the window
+  s('old', 'alpha', '2026-07-01T10:00:00Z', 900000)      // before the window
 ];
 
 const agg = aggregate(sessions, { since: '2026-08-04T05:00:00Z', minFuel: DEFAULT_MIN_FUEL });
@@ -81,7 +84,7 @@ test('total fuel counts only what survived the cut', () =>
   agg.totals.fuel === 500000);
 
 test('projects are ranked by fuel', () =>
-  agg.byProject[0].label === 'athena' && agg.byProject[1].label === 'ccfuel');
+  agg.byProject[0].label === 'alpha' && agg.byProject[1].label === 'ccfuel');
 
 test('project share is a percentage of the window total', () =>
   agg.byProject[0].share === 80 && agg.byProject[1].share === 20);

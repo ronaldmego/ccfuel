@@ -6,22 +6,55 @@ on:
   pull_request:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  test:
+    # macOS is not redundant here. node-pty is a native module and the two platforms take
+    # different paths: macOS loads the prebuilt binary shipped in the tarball (whose
+    # spawn-helper arrives non-executable — see scripts/fix-pty-permissions.js), while Linux
+    # has no prebuild and compiles from source. A Linux-only matrix stayed green through a
+    # macOS-only failure that made every PTY fetch die with "posix_spawnp failed."
+    #
+    # `engines` declares >=22, so 22 is the floor and there is no upper bound. 22 and 24 are the
+    # lines CI covers (active LTS lines); newer lines are expected to work and are not gated here.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['22', '24']
+
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
           cache: 'npm'
-      - name: Install dependencies
+
+      # Deliberately `npm ci` and not `npm install`: it is the command the README gives and
+      # the one that exposed the missing dependency (it prunes to package.json and exits 0).
+      - name: Install
         run: npm ci
+
       - name: Syntax check
         run: |
           node --check server.js
           node --check claude-usage.js
           node --check reset-cycle.js
           node --check session-metrics.js
+          node --check scripts/demo.js
+          node --check scripts/synthetic-fixture.js
+          node --check scripts/fix-pty-permissions.js
+          node --check test/claims.test.js
+          node --check test/demo-entrypoint.test.js
 
+      # Fails on any high/moderate advisory that has a fix available. Low severity is not a
+      # release gate for a localhost dashboard with no untrusted input.
+      - name: Audit
+        run: npm audit --audit-level=moderate
+
+      # Pure tests, the /usage parser, the PTY spawn round-trip, and a real `node server.js`
+      # boot over a synthetic fixture.
       - name: Tests
         run: npm test
