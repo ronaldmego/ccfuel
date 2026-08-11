@@ -1,11 +1,54 @@
 // Claude Usage via PTY (interactive)
-// Spawns claude interactively, sends /usage slash command, parses output
-// Requires node-pty (already a dependency)
+// Spawns claude interactively, sends /usage slash command, parses output.
+// Requires node-pty — a declared dependency in package.json.
 
 const pty = require('node-pty');
 const fs = require('fs');
 
-function getClaudeUsage(debug = false) {
+// UTC offset in hours used to turn the wall-clock time printed by /usage ("resets 10am")
+// into a real instant. Same variable the server and the frontend read, so a single setting
+// moves the whole app off the default.
+const DEFAULT_TZ_OFFSET = parseInt(process.env.DASHBOARD_TIMEZONE || '-5', 10);
+
+// Where to spawn `claude`. Claude Code trusts folders individually and asks before working
+// in an unknown one; that prompt swallows the keystrokes (see BLOCKERS below). Defaults to
+// inheriting the server's cwd — set this to a folder you have already trusted if the
+// ccfuel checkout itself is not one.
+const CLAUDE_CWD = process.env.DASHBOARD_CLAUDE_CWD || undefined;
+
+// Boot-time states that no amount of retyping can get past. Both used to spend the full
+// 35 s timeout and come back as a generic "Timeout waiting for /usage output", which is the
+// failure #44 described as indistinguishable from a slow panel. Detected on the way in,
+// they end the fetch immediately with something the operator can act on.
+//
+// Detection only — the prompts are never answered. Accepting a trust prompt on the user's
+// behalf is a security decision that belongs to the user, and a fuel gauge has no business
+// making it.
+const BLOCKERS = [
+  {
+    kind: 'trust-prompt',
+    test: /Is this a project you created or one you trust|Yes, I trust this folder/i,
+    message: 'Claude Code is asking whether to trust the folder it was spawned in, and the '
+      + 'prompt swallows the /usage keystrokes. Run `claude` once in that folder and accept, '
+      + 'or point DASHBOARD_CLAUDE_CWD at a folder you already trust.'
+  },
+  {
+    kind: 'login-required',
+    test: /Please run \/login|\bnot logged in\b/i,
+    message: 'Claude Code is not authenticated. Run `claude` and complete /login, then retry.'
+  }
+];
+
+function stripAnsi(raw) {
+  return raw
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ' ')
+    .replace(/\x1b\[[0-9;?]*[hlm]/g, ' ')
+    .replace(/\x1b\][^\x07]*\x07/g, ' ')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function getClaudeUsage(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
   return new Promise((resolve) => {
     let output = '';
     let settled = false;
@@ -41,6 +84,7 @@ function getClaudeUsage(debug = false) {
       name: 'xterm',
       cols: 200,
       rows: 50,
+      ...(CLAUDE_CWD ? { cwd: CLAUDE_CWD } : {}),
       env: { ...cleanEnv, TERM: 'xterm', NO_COLOR: '1' }
     });
 
@@ -56,13 +100,38 @@ function getClaudeUsage(debug = false) {
     const timer = setTimeout(() => {
       if (debug) console.log('Timeout reached');
       cleanup();
-      const result = parseUsageOutput(output);
-      result.errorMessage = result.success ? null : 'Timeout waiting for /usage output';
+      const result = parseUsageOutput(output, tzOffset);
+      if (!result.success) {
+        result.failureKind = 'timeout';
+        result.errorMessage = 'Timeout waiting for /usage output';
+      }
       resolve(result);
     }, TOTAL_TIMEOUT);
 
+    // Give up early on a state that retyping cannot clear, instead of burning the full
+    // timeout on it. Only checked before the echo arrives — once /usage is on screen the
+    // TUI is accepting input and these phrases can no longer be what is in the way.
+    const detectBlocker = () => {
+      if (settled || enterSent) return false;
+      const clean = stripAnsi(output);
+      const hit = BLOCKERS.find(b => b.test.test(clean));
+      if (!hit) return false;
+
+      clearTimeout(timer);
+      cleanup();
+      const result = parseUsageOutput(output, tzOffset);
+      if (!result.success) {
+        result.failureKind = hit.kind;
+        result.errorMessage = hit.message;
+      }
+      resolve(result);
+      return true;
+    };
+
     term.onData((data) => {
       output += data;
+
+      if (detectBlocker()) return;
 
       // El eco confirma que la TUI aceptó la tecla: recién ahí tiene sentido Enter.
       // Va acá y no en el tick del reintento para no esperar hasta 1.5s de más en el
@@ -87,7 +156,7 @@ function getClaudeUsage(debug = false) {
       if (output.includes('/usage')
           && /resets/i.test(output)
           && /current\s+(session|week)/i.test(output)
-          && parseUsageOutput(output).success) {
+          && parseUsageOutput(output, tzOffset).success) {
         setTimeout(() => {
           if (!settled) {
             clearTimeout(timer);
@@ -98,7 +167,7 @@ function getClaudeUsage(debug = false) {
               fs.writeFileSync('/tmp/claude-usage-debug.log', output);
             }
 
-            const result = parseUsageOutput(output);
+            const result = parseUsageOutput(output, tzOffset);
             resolve(result);
           }
         }, 2000);
@@ -109,8 +178,9 @@ function getClaudeUsage(debug = false) {
       if (!settled) {
         clearTimeout(timer);
         settled = true;
-        const result = parseUsageOutput(output);
+        const result = parseUsageOutput(output, tzOffset);
         if (!result.success) {
+          result.failureKind = 'exited-early';
           result.errorMessage = 'Claude exited before /usage completed';
         }
         resolve(result);
@@ -136,14 +206,18 @@ function getClaudeUsage(debug = false) {
   });
 }
 
-function parseUsageOutput(output) {
+/**
+ * Parse the text scraped off the /usage panel.
+ *
+ * @param {string} output   raw PTY capture (ANSI included)
+ * @param {number} tzOffset UTC offset in hours the panel's wall-clock times are in.
+ *   /usage prints local wall-clock ("resets 10am") with no zone, so turning it into an
+ *   instant needs the offset from outside. Defaults to DASHBOARD_TIMEZONE; injectable so
+ *   the tests are deterministic wherever they run.
+ */
+function parseUsageOutput(output, tzOffset = DEFAULT_TZ_OFFSET) {
   // Clean ANSI codes
-  const clean = output
-    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ' ')
-    .replace(/\x1b\[[0-9;?]*[hlm]/g, ' ')
-    .replace(/\x1b\][^\x07]*\x07/g, ' ')
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ')
-    .replace(/\s+/g, ' ');
+  const clean = stripAnsi(output);
 
   // --- Section-based parsing ---
   const sectionDefs = [
@@ -191,22 +265,23 @@ function parseUsageOutput(output) {
 
       resetsAtHour = hour;
 
+      // The panel prints wall-clock time in the user's zone; `- tzOffset` lifts it to UTC.
       if (monthStr && dayStr) {
         const monthMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
         const month = monthMap[monthStr.toLowerCase().slice(0, 3)];
         const day = parseInt(dayStr);
         const year = new Date().getUTCFullYear();
-        resetsAt = new Date(Date.UTC(year, month, day, hour + 5, minute, 0)).toISOString();
+        resetsAt = new Date(Date.UTC(year, month, day, hour - tzOffset, minute, 0)).toISOString();
       } else {
-        const now = new Date();
-        const panamaMs = now.getTime() + (-5 * 60 * 60 * 1000);
-        const panama = new Date(panamaMs);
-        let resetDate = new Date(panama);
+        // No date on screen (a bare "2am"): anchor to the next occurrence of that hour,
+        // reckoned in the configured zone.
+        const localNow = new Date(Date.now() + (tzOffset * 60 * 60 * 1000));
+        let resetDate = new Date(localNow);
         resetDate.setUTCHours(hour, minute, 0, 0);
-        if (panama >= resetDate) {
+        if (localNow >= resetDate) {
           resetDate.setUTCDate(resetDate.getUTCDate() + 1);
         }
-        resetsAt = new Date(resetDate.getTime() + 5 * 60 * 60 * 1000).toISOString();
+        resetsAt = new Date(resetDate.getTime() - (tzOffset * 60 * 60 * 1000)).toISOString();
       }
     }
 
@@ -266,7 +341,7 @@ function parseUsageOutput(output) {
   };
 }
 
-module.exports = { getClaudeUsage };
+module.exports = { getClaudeUsage, parseUsageOutput, stripAnsi, BLOCKERS };
 
 if (require.main === module) {
   const debug = process.argv.includes('--debug');
