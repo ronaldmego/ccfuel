@@ -322,9 +322,25 @@
     /* Footer */
     .footer { text-align: center; padding: 20px; color: var(--ink-3); font-size: 0.78em; border-top: 1px solid var(--border); margin-top: 24px; }
     .footer span { font-family: var(--mono); color: var(--ink-2); }
+    /* Capture mode (DASHBOARD_DEMO=1). Hidden unless /api/config reports demo: true, so it
+       can never appear over real data. */
+    .demo-banner {
+      background: #b45309;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 7px 12px;
+    }
   </style>
 </head>
 <body>
+  <div id="demo-banner" class="demo-banner" hidden>
+    Demo mode — synthetic data. Not real usage.
+  </div>
+
   <!-- Header -->
   <header class="header">
     <div class="brand">
@@ -1768,6 +1784,10 @@
 
     fetch('/api/config').then(r => r.json()).then(cfg => {
       if (cfg.tzOffset != null) TZ_OFFSET = cfg.tzOffset;
+      if (cfg.demo) {
+        document.getElementById('demo-banner').hidden = false;
+        document.title = 'DEMO · ' + document.title;
+      }
     }).catch(() => {}).finally(() => {
       Promise.all([loadWeeklyHistory(), loadConsumoTab()]).then(() => {
         loadGlobalUsage();
