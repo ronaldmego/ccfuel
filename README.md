@@ -7,36 +7,72 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
 </p>
 
-**Fuel gauge for Claude Code.** Track the tokens that **actually burn your weekly quota**, ignoring cache reads (~96% of volume) that cost nothing.
+**Fuel gauge for Claude Code.** Read your weekly quota from Claude's own `/usage` gauge, then see **where the work went** — per project and per session — without raw token totals dominated by cache reads burying the signal.
 
-> Stop guessing. Know exactly how much Claude Code fuel you have left.
+> Stop guessing. Know how much Claude Code fuel you have left, and what took it.
 
 ## Why This Exists
 
-Claude Code has a weekly token limit. Burn it all and you're locked out until reset. But ~96% of reported tokens are **cache reads** — they don't count against your quota. This dashboard separates signal from noise.
+Claude Code has a weekly limit. Burn it and you're locked out until reset. The CLI will tell
+you *how much* is gone if you keep typing `/usage`; it will not tell you *what took it*, and
+the raw token counts in your local transcripts are dominated by cache reads, which makes them
+useless as an attribution signal (in my own corpus, ~96% of token volume — see below).
+
+So ccfuel keeps two things apart, and the separation is the whole design:
+
+| | Source | Answers | Status |
+|---|---|---|---|
+| **Official gauge** | Claude `/usage`, read via PTY | *How much* of the quota is gone | Authoritative — Anthropic's own number |
+| **Local fuel proxy** | Your session transcripts | *Where* the non-cache work concentrated | A heuristic ccfuel computes. Not an Anthropic formula |
 
 **What it tells you:**
 
-- **How much fuel is left** — Real weekly % (direct from Claude `/usage`)
-- **Your burn rate** — Weekly pace with alerts if you're running hot
-- **When you'll run out** — Projected depletion day
-- **Daily real cost** — Actual tokens, not inflated with cache reads
+- **How much fuel is left** — weekly % straight from Claude `/usage`
+- **Your burn rate** — pace across the cycle, from `/usage` snapshots over time
+- **When you'll run out** — projection from that measured pace
+- **Where the non-cache work went** — fuel-proxy shares by project and by session
 
-## What It Measures (and What It Doesn't)
-
-| Token Type | Counted? | Why |
-|-----------|----------|-----|
-| outputTokens | Yes | What Claude generates — costs quota |
-| inputTokens | Yes | New context — costs quota |
-| cacheCreationTokens | Yes | First cache write — costs quota |
-| **cacheReadTokens** | **No** | ~96% of volume, free or near-free |
+## The fuel proxy (and what it is not)
 
 **Formula:** `fuel = outputTokens + inputTokens + cacheCreationTokens`
 
-The four counters the API reports are **disjoint totals**, not nested. Writing this as
-`input - cacheRead` looks equivalent and is not: it mixes separate counters and goes negative
-whenever cache reads dominate, which is most of the time. Add up what costs; never subtract
-what doesn't. See `TECHNICAL-NOTES.md` for the full methodology.
+This is **ccfuel's own attribution proxy**, not a published Anthropic formula, and it is
+deliberately not convertible into quota percent.
+
+| Token counter | In the proxy? | Why |
+|-----------|----------|-----|
+| outputTokens | Yes | Generated content — never cached, always new work |
+| inputTokens | Yes | Uncached context sent on this turn |
+| cacheCreationTokens | Yes | Writing new content into the cache — new work, and priced *above* base input on the API |
+| **cacheReadTokens** | **No** | Reused cached context. Dominates raw volume and drowns out the signal (~96% in the corpus below) |
+
+**Why cache reads are excluded — carefully stated.** Reusing cached context is treated
+favorably: Anthropic's usage-limit guidance says cached project content "doesn't count against
+your limits when reused" and that "only new/uncached portions count against your limits", and
+on the API cache reads bill at **0.1× the base input token price** rather than full price.
+That is favorable treatment at a reduced rate, and Anthropic publishes **no formula** mapping
+Claude Code's four transcript counters onto the weekly percentage. So the proxy leaves cache
+reads out for exactly two stated reasons — favorable treatment, and dominant volume that buries
+the signal. It makes no claim about what Claude Code charges you.
+
+**Two units, never mixed.** Fuel-proxy tokens and quota percent are different units. The panel
+reports **shares** ("this project took 35% of the non-cache tokens you burned"), never "this
+session used N% of your week". Converting between them would need Anthropic's private
+weighting, which is not published.
+
+**The ~96% is an observation, not a constant.** Measured across 1,778 real sessions on the
+maintainer's own machine. Your corpus will differ with how you work; nothing in the code
+depends on the figure.
+
+**Sources**
+
+- Prompt caching pricing (cache reads at 0.1× base input): <https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing>
+- Usage limits and cached content: <https://support.claude.com/en/articles/9797557-usage-limit-best-practices>
+
+On the arithmetic: the four counters are **disjoint totals**, not nested. Writing the proxy as
+`input - cacheRead` looks equivalent and is not — it mixes separate counters and goes negative
+whenever cache reads dominate. Sum the terms; never subtract. See `TECHNICAL-NOTES.md` for the
+full methodology.
 
 ## Screenshots
 
@@ -205,10 +241,11 @@ Two tabs. Everything on the Overview tab is one scrolling page, not separate vie
   % deltas between snapshots (source `/api/usage-deltas`): *Cumulative usage* per cycle hour
   against the previous cycles and an ideal pace, *Burn rate* with a depletion estimate, *Daily
   consumption* (14 days), *Hourly consumption* (48h) and the *Activity pattern* heatmap by
-  weekday and hour. Last, *What burned it* — fuel by project and the heaviest sessions, read
-  from the local transcripts rather than `/usage`: the gauge says *how much* is gone, this says
-  *what took it*. It reports shares, never quota percent, because tokens and quota % are
-  different units (see `LIMITATIONS.md`). Source `/api/session-metrics`.
+  weekday and hour. Last, *What burned it* — the **fuel proxy** by project and the heaviest
+  sessions, computed from the local transcripts rather than read from `/usage`: the official
+  gauge says *how much* is gone, this estimates *where the non-cache work concentrated*. It
+  reports shares of the proxy, never quota percent — different units, not convertible (see
+  `LIMITATIONS.md`). Source `/api/session-metrics`.
 - **Weekly** — cycle progress for the current week, cumulative curves per cycle, and weekly
   history including when a cycle hit 100% and how long it was locked out. Source
   `/api/weekly-history` plus `curves` from `/api/usage-deltas`.
@@ -331,12 +368,14 @@ module that could not spawn. CI runs the whole thing on Linux and macOS, on Node
 - **Zero build step** — No React, no webpack. Vanilla JS + Chart.js.
 - **Two dependencies** — Express, and `node-pty` because there is no non-interactive way to
   read `/usage`. Both are load-bearing; nothing else is.
-- **Real metrics only** — Cache reads are noise. We filter them out.
+- **Official numbers stay official** — the quota gauge is Anthropic's own `/usage` figure. The
+  transcript-derived attribution is labelled a proxy everywhere it appears, and the two units are
+  never mixed or converted.
 - **Works anywhere** — Any machine with Claude Code installed and authenticated.
 
 ## Note
 
-This is a personal project, open for anyone who wants to try it. Requires a **Claude Pro or Max subscription** with Claude Code installed and authenticated. The dashboard reads local log files and the CLI's built-in usage display to automate what you'd otherwise check manually.
+This is a personal project, open for anyone who wants to try it. Requires a **Claude Pro or Max subscription** with Claude Code installed and authenticated. The dashboard reads local log files and the CLI's built-in usage display to automate what you'd otherwise check manually. It is not affiliated with or endorsed by Anthropic, and the fuel proxy is ccfuel's own heuristic — for the authoritative number, the `/usage` panel and Anthropic's own usage settings are the source.
 
 ## License
 

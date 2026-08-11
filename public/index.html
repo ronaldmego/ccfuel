@@ -526,7 +526,7 @@
           <span class="section-title">What burned it</span>
           <span class="section-meta" id="fuel-meta"></span>
         </div>
-        <div class="section-sub">Fuel by project and heaviest sessions — from local transcripts, not /usage</div>
+        <div class="section-sub">Where the non-cache work concentrated — local fuel <em>proxy</em> from transcripts, not the official /usage quota</div>
         <div class="fuel-pills" id="fuel-window-pills">
           <button class="fuel-pill active" data-window="cycle">Current cycle</button>
           <button class="fuel-pill" data-window="28d">Last 28 days</button>
@@ -1764,9 +1764,11 @@
         const hidden = d.totals.sessionsBelowCut
           ? ` ${d.totals.sessionsBelowCut} session(s) under the ${formatNumber(d.minFuel)}-token cut hidden (${formatNumber(d.totals.belowCutFuel)} tokens, ${d.totals.fuel ? (100 * d.totals.belowCutFuel / (d.totals.fuel + d.totals.belowCutFuel)).toFixed(1) : 0}%).`
           : '';
-        noteEl.textContent = 'Fuel = output + input + cache creation. Cache reads are excluded — '
-          + 'they are ~96% of all tokens and do not burn quota. Tokens are not the same unit as '
-          + 'the /usage percentage, so treat these as shares, not quota.' + hidden;
+        noteEl.textContent = 'Fuel proxy = output + input + cache creation — ccfuel\'s own '
+          + 'heuristic for attributing non-cache work, not an Anthropic formula. Cache reads are '
+          + 'excluded because reused context dominates raw volume (~96% in the maintainer\'s '
+          + 'corpus) and buries the signal. Proxy tokens are a different unit from the /usage '
+          + 'percentage, so these are shares of the proxy, never quota.' + hidden;
       } catch (e) {
         projEl.innerHTML = '<div class="fuel-empty">Failed to load</div>';
         tbody.innerHTML = '<tr><td colspan="5" class="fuel-empty">Failed to load</td></tr>';

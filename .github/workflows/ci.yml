@@ -45,6 +45,7 @@ jobs:
           node --check scripts/demo.js
           node --check scripts/synthetic-fixture.js
           node --check scripts/fix-pty-permissions.js
+          node --check test/claims.test.js
 
       # Fails on any high/moderate advisory that has a fix available. Low severity is not a
       # release gate for a localhost dashboard with no untrusted input.

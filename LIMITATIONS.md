@@ -85,7 +85,7 @@ fallback — but the dated reset is unavailable during that window.
 
 ### Historical bug: getTimezoneOffset
 
-Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to calculate Panama time. This made calculations depend on the browser's timezone and produced incorrect results if the browser was not in UTC. Fixed by using direct offset from UTC.
+Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to derive local time. This made calculations depend on the browser's timezone and produced incorrect results if the browser was not in UTC. Fixed by using the configured offset directly from UTC.
 
 ---
 
@@ -106,14 +106,32 @@ Before the fix, the frontend used `now.getTimezoneOffset()` from the browser to 
 The "What burned it" panel has a **different source** from every other metric: the local JSONL
 transcripts under `~/.claude/projects`, not `/usage`. That brings its own limits.
 
-- **Tokens ≠ quota %.** Converting token counts into a quota percentage needs Anthropic's private
-  weighting, so the panel reports **shares** ("this project took 60% of the tokens you burned"),
-  never "this session used N% of your week". The two numbers are not comparable.
+- **It is a proxy, not an official measurement.** `fuel = output + input + cache_creation` is
+  **ccfuel's own heuristic** for attributing non-cache work, not a published Anthropic formula.
+  Anthropic does not publish any mapping from Claude Code's four transcript counters onto the
+  weekly quota percentage, so nothing here should be read as "this is what Claude Code charges
+  you". The authoritative number is the `/usage` gauge, and only that.
+- **Why cache reads are left out, precisely.** Reusing cached context is treated favorably:
+  Anthropic's usage-limit guidance states that cached project content "doesn't count against
+  your limits when reused" and that "only new/uncached portions count against your limits", and
+  on the API cache reads are billed at **0.1× the base input token price** rather than full
+  price ([caching pricing](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing),
+  [usage limits](https://support.claude.com/en/articles/9797557-usage-limit-best-practices)).
+  That is favorable treatment at a reduced rate. The proxy excludes them for two stated reasons —
+  that favorable treatment, and reused context dominating raw volume and burying the attribution
+  signal. It makes no claim about what Claude Code charges.
+- **Tokens ≠ quota %.** Converting proxy tokens into a quota percentage would need Anthropic's
+  private weighting, so the panel reports **shares** ("this project took 60% of the non-cache
+  tokens in the window"), never "this session used N% of your week". The two are different units
+  and are never converted.
 - **The counters are disjoint, not nested.** `input_tokens`, `cache_creation_input_tokens`,
-  `cache_read_input_tokens` and `output_tokens` are separate totals. Fuel is therefore a **sum**
-  of what burns quota (`output + input + cache_creation`) and excludes cache reads — which are
-  ~96% of all tokens. Subtracting cache reads from input, as if they were a subset, produces
-  negative fuel (measured at `-9.45e9` across 1778 sessions, negative in 40% of them).
+  `cache_read_input_tokens` and `output_tokens` are separate totals. The proxy is therefore a
+  **sum** of its three terms, not `input - cache_read`: subtracting them as if cache reads were a
+  subset of input produces negative fuel (measured at `-9.45e9` across 1778 sessions, negative in
+  40% of them).
+- **The ~96% figure is an observation, not a constant.** Cache reads were ~96% of token volume
+  across the maintainer's own 1778-session corpus on one machine. It will differ with how you
+  work, and nothing in the code depends on it.
 - **One message, many rows.** A message is written to the transcript repeatedly while it
   streams, each row a fuller snapshot under the same `message.id`. Fuel and turns count each
   `message.id` **once** — the last snapshot, taken as a whole row, never a field-wise merge.
@@ -158,6 +176,9 @@ history — works without it.
 - PTY implementation: `claude-usage.js`
 - Per-session fuel collector: `session-metrics.js`
 - Timezone details: `TECHNICAL-NOTES.md`
+- Claim contract check: `test/claims.test.js`
+- Prompt caching pricing: https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing
+- Usage limits and cached content: https://support.claude.com/en/articles/9797557-usage-limit-best-practices
 - Anthropic Console: https://console.anthropic.com
 
 ---

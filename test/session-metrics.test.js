@@ -7,7 +7,8 @@ const { turnFuel, projectLabel, aggregate, DEFAULT_MIN_FUEL } = require('../sess
 const cases = [];
 const test = (name, fn) => cases.push([name, fn]);
 
-// --- fuel formula -----------------------------------------------------------------
+// --- fuel proxy -------------------------------------------------------------------
+// `fuel` is ccfuel's attribution proxy, not an official quota figure (see session-metrics.js).
 // The four counters are disjoint. The bug this guards against is treating cache reads as
 // a subset of input_tokens and subtracting them, which goes negative on real data.
 const realTurn = {
@@ -17,13 +18,13 @@ const realTurn = {
   cache_read_input_tokens: 14170955
 };
 
-test('fuel sums what burns quota and ignores cache reads', () =>
+test('the proxy sums its three terms and ignores cache reads', () =>
   turnFuel(realTurn) === 184 + 168165 + 446496);
 
 test('fuel is never negative when cache reads dominate', () =>
   turnFuel(realTurn) > 0);
 
-test('a cache-read-only turn burns nothing', () =>
+test('a cache-read-only turn contributes nothing to the proxy', () =>
   turnFuel({ input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 9000000 }) === 0);
 
 test('missing counters are treated as zero', () =>

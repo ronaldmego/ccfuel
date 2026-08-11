@@ -9,12 +9,24 @@
 // persists or serves message text. Nothing here should ever be relaxed to "just grab the
 // first user message for a label" — the session id and project slug are the only labels.
 //
-// FUEL: the four token counters in the Anthropic API are DISJOINT, not nested.
-// `cache_read_input_tokens` is not a subset of `input_tokens`, so the quota-burning
-// total is a SUM of what costs, never `input - cache_read` (that mixes disjoint counters
-// and goes negative — measured at -9.45e9 across 1778 real sessions, negative in 40% of
-// them). Cache reads are ~96% of all tokens and are excluded because they don't burn
-// quota; cache *creation* does.
+// FUEL IS A PROXY, NOT AN OFFICIAL MEASUREMENT. `output + input + cache_creation` is this
+// project's own heuristic for attributing non-cache work across projects and sessions.
+// Anthropic publishes no mapping from these transcript counters onto the weekly quota
+// percentage, so nothing here may be presented as what Claude Code charges. The
+// authoritative quota number is the /usage gauge (claude-usage.js) and only that; proxy
+// tokens and quota % are different units and are never converted.
+//
+// Cache reads are excluded because reused context dominates raw volume (~96% in the
+// maintainer's own 1778-session corpus — an observation about that corpus, not a constant)
+// and buries the attribution signal. Reuse is treated favorably by Anthropic — cached
+// project content "doesn't count against your limits when reused" — but on the API cache
+// reads still bill at 0.1x base input, so "favorable" is the claim, not "free". See
+// LIMITATIONS.md for the sources.
+//
+// ARITHMETIC: the four counters are DISJOINT, not nested. `cache_read_input_tokens` is not
+// a subset of `input_tokens`, so the proxy is a SUM of its three terms, never
+// `input - cache_read` (that mixes disjoint counters and goes negative — measured at
+// -9.45e9 across 1778 real sessions, negative in 40% of them).
 
 const fs = require('fs');
 const path = require('path');
@@ -32,7 +44,7 @@ const DEFAULT_MIN_FUEL = 10000;
 // reused.
 const SCHEMA_VERSION = 2;
 
-/** Quota-burning tokens for one assistant turn's `usage` block. */
+/** Proxy tokens (non-cache work) for one assistant turn's `usage` block. */
 function turnFuel(usage) {
   if (!usage) return 0;
   return (usage.output_tokens || 0)
