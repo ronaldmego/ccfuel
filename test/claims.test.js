@@ -96,6 +96,55 @@ for (const rel of SURFACE) {
   }
 }
 
+// --- SECURITY.md's promise, checked against the page that has to keep it ------------------
+//
+// "no third-party calls beyond running your local `claude` binary" was false: the dashboard
+// pulled IBM Plex from fonts.googleapis.com / fonts.gstatic.com and Chart.js from
+// cdn.jsdelivr.net — the last one unpinned, so a third party chose what code ran in the page.
+// A doc promise nobody enforces drifts back the first time someone wants a nicer font.
+//
+// Scanned for is the *runtime* surface: tags and CSS the browser resolves on load. Absolute URLs
+// inside HTML comments and in prose are not requests, so the scan strips comments first.
+const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
+const htmlNoComments = html.replace(/<!--[\s\S]*?-->/g, '');
+
+const REMOTE_TAGS = [
+  { re: /<link\b[^>]*\bhref\s*=\s*["']https?:\/\//i, what: '<link href="http(s)://…">' },
+  { re: /<link\b[^>]*\brel\s*=\s*["']?(preconnect|dns-prefetch|preload|modulepreload)/i,
+    what: 'preconnect/dns-prefetch/preload hint (only ever points off-origin here)' },
+  { re: /<script\b[^>]*\bsrc\s*=\s*["']https?:\/\//i, what: '<script src="http(s)://…">' },
+  { re: /<(img|iframe|video|audio|source|track|embed|object)\b[^>]*\b(src|data)\s*=\s*["']https?:\/\//i,
+    what: 'remote media/embed' },
+  { re: /@import\s+(url\()?["']?https?:\/\//i, what: 'CSS @import of a remote sheet' },
+  { re: /url\(\s*["']?https?:\/\//i, what: 'CSS url() pointing off-origin' },
+  { re: /["'`]https?:\/\/[^"'`]+["'`]\s*\)/i, what: 'fetch()/XHR to an absolute URL' }
+];
+
+htmlNoComments.split('\n').forEach((line, i) => {
+  for (const { re, what } of REMOTE_TAGS) {
+    if (re.test(line)) {
+      failures.push(`public/index.html:${i + 1}  remote runtime resource — ${what}\n`
+        + `      ${line.trim().slice(0, 130)}`);
+    }
+  }
+});
+
+// Chart.js must come from the local route, and the dependency must be declared.
+if (!/<script\b[^>]*\bsrc\s*=\s*["']\/vendor\/chart\.umd\.js["']/.test(htmlNoComments)) {
+  failures.push('public/index.html: does not load Chart.js from the local /vendor/chart.umd.js');
+}
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+if (!pkg.dependencies || !pkg.dependencies['chart.js']) {
+  failures.push('package.json: chart.js is served locally but not declared as a dependency');
+}
+
+// SECURITY.md may only keep the "no third-party calls" promise while the scan above holds. If
+// someone reintroduces a CDN, this reminds them the promise is the thing that broke.
+const security = fs.readFileSync(path.join(ROOT, 'SECURITY.md'), 'utf8');
+if (!/no third-party calls|no outbound|does not make any network/i.test(security)) {
+  failures.push('SECURITY.md: lost its statement about third-party calls — keep it, and keep it true');
+}
+
 // The positive half: the proxy framing has to be present, not merely un-contradicted.
 const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 const REQUIRED = [
@@ -116,6 +165,8 @@ for (const f of failures) console.log(`  FAIL   ${f}`);
 if (failures.length === 0) {
   console.log(`  ok     no absolute quota claims survive`);
   console.log(`  ok     the proxy framing and both sources are present in the README`);
+  console.log(`  ok     the page loads no remote runtime resources (SECURITY.md stays true)`);
+  console.log(`  ok     Chart.js comes from /vendor/chart.umd.js and is a declared dependency`);
 }
-console.log(`\n${failures.length === 0 ? 2 : 0}/2 passed`);
+console.log(`\n${failures.length === 0 ? 4 : 0}/4 passed`);
 assert.strictEqual(failures.length, 0, `${failures.length} unsupported claim(s) on the publication surface`);

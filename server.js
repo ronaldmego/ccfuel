@@ -547,6 +547,32 @@ app.use(express.json({ limit: '10mb' }));
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Chart.js, served from the npm dependency instead of a CDN. The dashboard used to load it from
+// cdn.jsdelivr.net — unpinned — which contradicted SECURITY.md's "no third-party calls" and let a
+// third party decide what code ran in the page. Version comes from package-lock.json; no minified
+// blob is committed to the repo.
+//
+// The path is resolved off the package entry because chart.js 4's `exports` map refuses deep
+// subpath requires (`chart.js/dist/chart.umd.js` and even `chart.js/package.json` throw
+// ERR_PACKAGE_PATH_NOT_EXPORTED), so require.resolve cannot reach the UMD build directly.
+const CHART_UMD = (() => {
+  try {
+    return path.join(path.dirname(require.resolve('chart.js')), 'chart.umd.js');
+  } catch (e) {
+    return null;
+  }
+})();
+
+app.get('/vendor/chart.umd.js', (req, res) => {
+  if (!CHART_UMD || !fs.existsSync(CHART_UMD)) {
+    // Every chart on the page is dead without this, so say so plainly rather than 404.
+    return res.status(503)
+      .type('text/plain')
+      .send('chart.js is not installed — run `npm ci`. The dashboard renders no charts without it.');
+  }
+  res.type('application/javascript').sendFile(CHART_UMD);
+});
+
 // API endpoints
 
 app.get('/api/refresh', (req, res) => {
@@ -885,6 +911,12 @@ if (DEMO) {
 app.listen(PORT, HOST, () => {
   console.log(`🚀 ccfuel running at http://${HOST}:${PORT}`);
   console.log(`💾 Data directory: ${DATA_DIR}`);
+
+  // Loud at boot rather than as four blank canvases in the browser.
+  if (!CHART_UMD || !fs.existsSync(CHART_UMD)) {
+    console.warn('⚠️  chart.js not found in node_modules — /vendor/chart.umd.js will 503 and no '
+      + 'chart will render. Run `npm ci`.');
+  }
 
   if (DEMO) {
     console.log('🎬 DEMO MODE — serving synthetic fixtures. No PTY spawn, no transcript read.');

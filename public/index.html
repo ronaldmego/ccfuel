@@ -5,10 +5,22 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ccfuel · Fuel gauge for Claude Code</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!--
+    NO REMOTE RESOURCES. Every asset this page loads is served by ccfuel itself.
+
+    This used to pull IBM Plex from fonts.googleapis.com/fonts.gstatic.com and Chart.js from
+    cdn.jsdelivr.net, which made SECURITY.md's promise of "no third-party calls beyond running
+    your local claude binary" false: opening the dashboard announced itself to two CDNs on every
+    load. The Chart.js tag was also unpinned (`npm/chart.js`), so the page executed whatever the
+    CDN happened to be serving that day.
+
+    Chart.js now comes from the npm dependency, served at /vendor/chart.umd.js straight out of
+    node_modules — version-pinned in package-lock.json, no minified blob committed here. The font
+    stacks below keep their named families and fall through to system fonts; nothing is fetched.
+
+    Enforced by test/claims.test.js (static scan) and test/server-smoke.test.js (route + runtime).
+  -->
+  <script src="/vendor/chart.umd.js"></script>
   <style>
     :root {
       --bg: #eef1f6;

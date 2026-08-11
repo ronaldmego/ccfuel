@@ -87,6 +87,7 @@ full methodology.
 ```
 Node.js + Express
 Frontend: Vanilla HTML/CSS/JS + Chart.js (single index.html, no build step)
+           served entirely from localhost — no CDN, no webfont, no outbound request
 Data: Claude /usage (via PTY) — periodic % snapshots
 Process Manager: PM2 (optional)
 ```
@@ -109,7 +110,7 @@ Process Manager: PM2 (optional)
 
 ## Quick Start
 
-Works on any machine where Claude Code is installed. Reads `~/.claude/` logs automatically.
+Tested on macOS and Linux with Claude Code installed ([full matrix](LIMITATIONS.md#platform-support)). Reads `~/.claude/` logs automatically.
 
 ```bash
 git clone https://github.com/ronaldmego/ccfuel.git
@@ -366,12 +367,17 @@ module that could not spawn. CI runs the whole thing on Linux and macOS, on Node
 ## Design Philosophy
 
 - **Zero build step** — No React, no webpack. Vanilla JS + Chart.js.
-- **Two dependencies** — Express, and `node-pty` because there is no non-interactive way to
-  read `/usage`. Both are load-bearing; nothing else is.
+- **Local-first, literally** — the dashboard loads no remote resource. Chart.js is served from
+  `node_modules` at `/vendor/chart.umd.js`; fonts fall back to system families. Opening the page
+  makes no request to any other host. See `SECURITY.md`.
+- **Three dependencies** — Express; `node-pty`, because there is no non-interactive way to read
+  `/usage`; and `chart.js`, served locally rather than from a CDN so the page stays offline-clean
+  and the version is pinned in the lockfile. All three are load-bearing; nothing else is.
 - **Official numbers stay official** — the quota gauge is Anthropic's own `/usage` figure. The
   transcript-derived attribution is labelled a proxy everywhere it appears, and the two units are
   never mixed or converted.
-- **Works anywhere** — Any machine with Claude Code installed and authenticated.
+- **Validated where it is tested** — macOS and Linux, Node 22 and 24 in CI. Windows is untested
+  rather than supported; the honest matrix is in [`LIMITATIONS.md`](LIMITATIONS.md#platform-support).
 
 ## Note
 

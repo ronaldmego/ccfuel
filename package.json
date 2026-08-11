@@ -1,7 +1,7 @@
 {
   "name": "ccfuel",
   "version": "1.1.0",
-  "description": "Fuel gauge for Claude Code \u2014 official weekly quota from /usage, plus a local proxy for where the non-cache work went",
+  "description": "Fuel gauge for Claude Code — official weekly quota from /usage, plus a local proxy for where the non-cache work went",
   "main": "server.js",
   "engines": {
     "node": ">=22"
@@ -14,6 +14,7 @@
     "test": "node test/claims.test.js && node test/reset-cycle.test.js && node test/session-metrics.test.js && node test/session-scan.test.js && node test/usage-parse.test.js && node test/pty-smoke.test.js && node test/server-smoke.test.js"
   },
   "dependencies": {
+    "chart.js": "4.5.1",
     "express": "^4.22.2",
     "node-pty": "^1.1.0"
   }

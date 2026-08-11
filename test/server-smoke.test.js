@@ -107,6 +107,22 @@ async function main() {
     check('GET / serves the dashboard', html.status === 200 && text.includes('ccfuel'));
     check('the demo banner markup is present for capture mode', text.includes('demo-banner'));
 
+    // Chart.js is served from node_modules, not a CDN. The static half of this (no remote tags
+    // in the HTML) is in claims.test.js; what only a running server can prove is that the route
+    // actually delivers the runtime — a broken path would leave four blank canvases, which no
+    // static scan notices.
+    const vendor = await fetch(base + '/vendor/chart.umd.js');
+    const vendorBody = vendor.ok ? await vendor.text() : '';
+    check('/vendor/chart.umd.js responds 200', vendor.status === 200, `status ${vendor.status}`);
+    check('it is served as JavaScript',
+      /javascript|ecmascript/i.test(vendor.headers.get('content-type') || ''),
+      vendor.headers.get('content-type'));
+    check('it is the Chart.js UMD runtime, not an error page',
+      vendorBody.includes('Chart.js') && /\bChart\b/.test(vendorBody) && vendorBody.length > 100000,
+      `${vendorBody.length} bytes, banner: ${(vendorBody.match(/Chart\.js v[\d.]+/) || ['none'])[0]}`);
+    check('the page requests exactly that path',
+      text.includes('src="/vendor/chart.umd.js"'));
+
     const cfg = await get('/api/config');
     check('/api/config reports the configured offset and demo flag',
       cfg.body.tzOffset === TZ && cfg.body.demo === true,
