@@ -842,7 +842,12 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        if ((!data.session || data.session.percent == null) && retries > 0) {
+        // What makes a payload renderable is a weekly number, not the presence of the
+        // objects that carry it: a failed fetch still ships `session` and `weekAll` with
+        // percent null inside, which is enough to paint a literal "null%" (#49).
+        const hasNumbers = data.session && data.weekAll && data.weekAll.percent != null;
+
+        if (!hasNumbers && retries > 0) {
           await new Promise(r => setTimeout(r, 2000));
           return loadGlobalUsage(retries - 1);
         }
@@ -850,7 +855,7 @@
         if (data.authError) {
           statusEl.textContent = "⚠️ " + (data.errorMessage || "Auth error");
           statusEl.style.color = "#dc2626";
-        } else if (data.session && data.weekAll) {
+        } else if (hasNumbers) {
           document.getElementById('global-session').textContent = data.session.percent + '%';
           document.getElementById('global-week').textContent = data.weekAll.percent + '%';
           document.getElementById('global-sonnet').textContent = data.weekSonnet.percent + '%';
@@ -892,6 +897,15 @@
           const cacheNote = data.cached ? ` · cache ${cacheMinutes != null ? cacheMinutes + 'm' : '✓'}` : ' · live';
           statusEl.textContent = 'Updated: ' + new Date(data.timestamp).toLocaleTimeString('en-US') + cacheNote;
 
+          // These numbers are the last good ones and the fetch behind them failed. They
+          // are still the best answer — a 0% would be worse — but the timestamp alone
+          // reads as "measured just now", so name the failure next to it.
+          if (data.stale) {
+            statusEl.textContent = 'Last good: ' + new Date(data.timestamp).toLocaleTimeString('en-US')
+              + ' — ' + (data.errorMessage || 'the latest fetch failed');
+            statusEl.style.color = '#b45309';
+          }
+
           if (data.weekAll.resetsAt != null) {
             weeklyResetsAt = data.weekAll.resetsAt;
           }
@@ -926,8 +940,20 @@
           loadWeeklyHistory();
 
           document.getElementById('last-update').textContent = new Date().toLocaleString('en-US');
+        } else if (data.fetching) {
+          // No value yet and nothing wrong: the PTY fetch takes ~6s and one is running.
+          statusEl.textContent = 'Fetching from Claude…';
         } else {
-          document.getElementById('global-usage-status').textContent = 'Error: ' + (data.error || 'Unknown');
+          // `errorMessage` is what the payload carries; `error` only exists on the 500
+          // path. Reading just the latter is what turned every diagnosed failure into
+          // the useless "Error: Unknown" (#49).
+          statusEl.textContent = 'Error: ' + (data.errorMessage || data.error || 'Unknown');
+          statusEl.style.color = '#dc2626';
+
+          // The gauges are written only on the success branch, so without this they sit
+          // at "Loading…" forever and the page looks like it is still working on it.
+          document.getElementById('session-gauge-info').textContent = 'No reading';
+          document.getElementById('week-gauge-info').textContent = 'No reading';
         }
       } catch (e) {
         console.error('Error loading global usage:', e);
