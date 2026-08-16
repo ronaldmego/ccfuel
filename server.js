@@ -610,22 +610,36 @@ app.get('/api/global-usage', async (req, res) => {
   
   // Prevent concurrent fetches
   if (globalUsageCache.fetching) {
+    // Spreading an empty cache used to yield a body with neither numbers nor a reason,
+    // which the dashboard could only render as "Error: Unknown" (#49). Nothing is wrong
+    // in that state: the first fetch after a restart is simply still running, and it
+    // takes ~6s. Say that, so the caller waits instead of reporting a failure.
+    if (!globalUsageCache.data) {
+      return res.json({
+        success: false,
+        fetching: true,
+        failureKind: 'fetch-in-flight',
+        errorMessage: 'First /usage fetch is still running — no value cached yet'
+      });
+    }
     return res.json({
       ...globalUsageCache.data,
       cached: true,
       fetching: true
     });
   }
-  
+
   try {
     globalUsageCache.fetching = true;
     console.log('🔄 Fetching global usage from Claude...');
 
     const usage = await fetchAndSnapshot();
 
+    // A stale fallback IS the cached value — the fetch behind it failed. Saying
+    // `cached: false` there would date a number that nobody just measured.
     res.json({
       ...usage,
-      cached: false
+      cached: usage.stale === true
     });
   } catch (error) {
     console.error('❌ Failed to fetch global usage:', error.message);
@@ -838,7 +852,19 @@ async function fetchAndSnapshot({ retryOnFailure = false } = {}) {
       '— keeping last good value. Raw /usage:\n'
       + (usage.rawClean || '(raw unavailable)'));
     delete usage.rawClean; // never cache or serve it — this path can return `usage` itself
-    return globalUsageCache.data || usage;
+
+    // Keeping the last good value is right; serving it unmarked is not. Without this the
+    // caller cannot tell a number measured seconds ago from one frozen since the fetcher
+    // started failing, and the errorMessage #48 just produced dies in this log line.
+    if (globalUsageCache.data) {
+      return {
+        ...globalUsageCache.data,
+        stale: true,
+        failureKind: usage.failureKind,
+        errorMessage: usage.errorMessage
+      };
+    }
+    return usage;
   }
 
   // Instrumentation: a sustained drop in the weekly % is physically impossible for a
