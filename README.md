@@ -378,7 +378,6 @@ module that could not spawn. CI runs the whole thing on Linux and macOS, on Node
 |------|----------|
 | `TECHNICAL-NOTES.md` | Measurement methodology: real fuel vs cache reads |
 | `LIMITATIONS.md` | Known limitations (PTY dependency, timezone) |
-| `CHANGELOG.md` | Version history |
 
 ## Design Philosophy
 
