@@ -37,8 +37,12 @@ See `TECHNICAL-NOTES.md` for how measurement works and `LIMITATIONS.md` for know
 
 1. Branch from `main`: `git checkout -b fix/short-description`
 2. Make the change, then verify it from a clean clone: `npm ci && npm test && node server.js`. CI runs the same on Linux and macOS, Node 22 and 24.
-3. Update `CHANGELOG.md` under `[Unreleased]`.
-4. Open the PR with a clear description of the problem and the fix.
+3. Open the PR with a clear description of the problem and the fix.
+
+## What changed, and when
+
+There is no changelog file. What shipped lives in the commits and in the issues each one
+closes, which is where the reasoning is anyway.
 
 ## Reporting bugs
 

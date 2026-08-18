@@ -30,11 +30,6 @@ const ROOT = path.join(__dirname, '..');
 
 // The surface a reader or a package registry actually sees.
 //
-// CHANGELOG.md is deliberately NOT here. A changelog has to be able to quote the wording it
-// removed in order to record the correction, and scanning it would make documenting this very
-// fix impossible. Not an oversight — everything it quotes is explicitly framed as what the
-// project used to say and why that was wrong.
-//
 // Two other surfaces this cannot reach, and which have to be checked by hand:
 //   - the GitHub repo description and topics (metadata, not files in the tree);
 //   - screenshots/*.png (rendered pixels — re-shoot them if the UI copy changes).
