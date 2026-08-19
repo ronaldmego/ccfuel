@@ -92,6 +92,17 @@ function buildFixture(dir, { now, tzOffset = -5 } = {}) {
   const STEP = 30 * 60 * 1000;
   const START = resetsAtMs - 4 * 7 * DAY;
 
+  // The tail always burns, whatever hour the fixture is built at. `computeCurrentRate()` in
+  // server.js averages the deltas of the *last 6 hours of real time*, while the day/night
+  // shape below is anchored to the local hour — so a fixture built between ~20:00 and ~09:00
+  // local left that window empty, the rate came out 0, the projection null, and the smoke
+  // went red by the clock instead of by the code (#53). It also made `npm run demo` capture a
+  // dashboard with no burn rate at those hours, which is not the screenshot anyone wants.
+  // 8 hours and not 6: the server keeps whole local-hour buckets and drops the oldest one
+  // when it is only partially inside the window.
+  const RATE_WINDOW_HOURS = 8;
+  const rateWindowStart = now - RATE_WINDOW_HOURS * HOUR;
+
   for (let t = START; t <= now; t += STEP) {
     const info = cycleInfoFor(t, resetsAtMs, tzOffset);
     const localHour = new Date(t + tzOffset * HOUR).getUTCHours();
@@ -100,7 +111,7 @@ function buildFixture(dir, { now, tzOffset = -5 } = {}) {
     // is the state worth showing — the history row then reports when 100% was hit and how
     // many hours were spent locked out, which is the whole argument for watching the gauge.
     const heat = 1 + 0.16 * info.cyclesAgo;
-    const active = localHour >= 9 && localHour < 20;
+    const active = t >= rateWindowStart || (localHour >= 9 && localHour < 20);
     const burst = active ? (0.2 + rand() * 0.7) * heat : rand() * 0.04;
 
     const prev = perCyclePeak[info.weekId] ?? 2; // never start at 0: leading zeros are skipped
@@ -119,6 +130,13 @@ function buildFixture(dir, { now, tzOffset = -5 } = {}) {
 
   fs.writeFileSync(path.join(dir, 'usage-curve.json'),
     JSON.stringify({ snapshots }, null, 2));
+
+  // What the rate window actually holds, so a caller can assert on it instead of inferring
+  // it from a red line that says nothing about which half failed.
+  const inWindow = snapshots.filter(s => Date.parse(s.timestamp) >= rateWindowStart);
+  const rateWindowDelta = inWindow.length
+    ? inWindow[inWindow.length - 1].weekPercent - inWindow[0].weekPercent
+    : 0;
 
   // --- weekly history: the closing value of each cycle in the curve -----------------
   const closing = {};
@@ -229,6 +247,8 @@ function buildFixture(dir, { now, tzOffset = -5 } = {}) {
     weekAllPercent: currentPercent,
     sessionPercent: globalUsage.session.percent,
     snapshots: snapshots.length,
+    rateWindowHours: RATE_WINDOW_HOURS,
+    rateWindowDelta,
     weeks: history.length,
     sessionFiles: Object.keys(byFile).length,
     sessionsAboveCut: aboveCutCount,

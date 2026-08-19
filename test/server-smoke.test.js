@@ -167,8 +167,16 @@ async function main() {
     check('/api/usage-deltas produces daily, hourly and a 7x24 heatmap',
       deltas.body.daily.length > 0 && deltas.body.hourly.length > 0
       && deltas.body.heatmap.length === 7 && deltas.body.heatmap[0].length === 24);
+    // Two checks and not one, on purpose (#53): "the fixture left nothing in the window the
+    // server measures" and "the server measured it wrong" are different failures, and folding
+    // them into a single red line is what made this test read as flaky for a while.
+    check('the fixture leaves burn inside the rate window the server reads',
+      fx.rateWindowDelta > 0,
+      `${fx.rateWindowDelta}pp in the last ${fx.rateWindowHours}h`);
     check('a burn rate and a projection are derived',
-      deltas.body.currentRate.perHour > 0 && deltas.body.projection.hoursLeft !== null);
+      deltas.body.currentRate.perHour > 0 && deltas.body.projection.hoursLeft !== null,
+      `perHour=${deltas.body.currentRate.perHour} over ${deltas.body.currentRate.hoursUsed}h, `
+      + `hoursLeft=${deltas.body.projection.hoursLeft}`);
 
     const wh = await get('/api/weekly-history');
     check('/api/weekly-history returns every cycle in the fixture',
