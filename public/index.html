@@ -407,7 +407,7 @@
 
   <!-- Main Content -->
   <main class="main">
-    <div class="overline">Official source · Claude /usage · timezone UTC−5</div>
+    <div class="overline">Official source · your Claude account · timezone <span id="tz-label">UTC−5</span></div>
 
     <!-- Tabs -->
     <div class="tabs">
@@ -420,7 +420,7 @@
       <!-- Official usage -->
       <div class="global-usage-card" id="global-usage-section">
         <div class="global-usage-header">
-          <span class="global-usage-title">Official usage<small>reported by Claude /usage</small></span>
+          <span class="global-usage-title">Official usage<small id="global-usage-source">reported by your Claude account</small></span>
           <button class="icon-btn" onclick="refreshGlobalUsage()" id="global-refresh-btn" title="Refresh official usage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path>
@@ -489,7 +489,7 @@
         <div class="section-head">
           <span class="section-title">Cumulative usage</span>
         </div>
-        <div class="section-sub">% cumulative per cycle hour · source Claude /usage</div>
+        <div class="section-sub">% cumulative per cycle hour · source: the official gauge</div>
         <div id="comparison-week-selector" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
         <div id="comparison-container">
           <div class="comparison-wrapper"><canvas id="comparisonChart"></canvas></div>
@@ -856,6 +856,18 @@
           statusEl.textContent = "⚠️ " + (data.errorMessage || "Auth error");
           statusEl.style.color = "#dc2626";
         } else if (hasNumbers) {
+          // Which source answered is worth showing, not guessing: the gauge behaving oddly is
+          // exactly when you want to know whether it came from the endpoint, from Claude
+          // Code's cached read, or from scraping the panel (#57).
+          const srcEl = document.getElementById('global-usage-source');
+          if (srcEl) {
+            const label = {
+              endpoint: 'read from the usage endpoint',
+              cache: "from Claude Code's cached read",
+              pty: 'scraped from the /usage panel'
+            }[data.source];
+            srcEl.textContent = 'reported by your Claude account' + (label ? ' · ' + label : '');
+          }
           document.getElementById('global-session').textContent = data.session.percent + '%';
           document.getElementById('global-week').textContent = data.weekAll.percent + '%';
           document.getElementById('global-sonnet').textContent = data.weekSonnet.percent + '%';
@@ -1837,6 +1849,10 @@
 
     fetch('/api/config').then(r => r.json()).then(cfg => {
       if (cfg.tzOffset != null) TZ_OFFSET = cfg.tzOffset;
+      // The overline used to carry a hardcoded UTC−5 while every clock beside it followed the
+      // configured offset, so the label contradicted the data on any other setting (#57).
+      const tzLabel = document.getElementById('tz-label');
+      if (tzLabel) tzLabel.textContent = 'UTC' + (TZ_OFFSET < 0 ? '−' : '+') + Math.abs(TZ_OFFSET);
       if (cfg.demo) {
         const banner = document.getElementById('demo-banner');
         banner.hidden = false;
