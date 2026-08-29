@@ -22,7 +22,7 @@ So ccfuel keeps two things apart, and the separation is the whole design:
 
 | | Source | Answers | Status |
 |---|---|---|---|
-| **Official gauge** | Claude `/usage`, read via PTY | *How much* of the quota is gone | Authoritative — Anthropic's own number |
+| **Official gauge** | The account's own usage figures, read the way Claude Code reads them | *How much* of the quota is gone | Authoritative — Anthropic's own number |
 | **Local fuel proxy** | Your session transcripts | *Where* the non-cache work concentrated | A heuristic ccfuel computes. Not an Anthropic formula |
 
 **What it tells you:**
@@ -94,7 +94,7 @@ orange banner across the top says, and it is pinned so it cannot scroll out of a
 Node.js + Express
 Frontend: Vanilla HTML/CSS/JS + Chart.js (single index.html, no build step)
            served entirely from localhost — no CDN, no webfont, no outbound request
-Data: Claude /usage (via PTY) — periodic % snapshots
+Data: the account's usage endpoint (PTY fallback) — periodic % snapshots
 Process Manager: PM2 (optional)
 ```
 
@@ -127,12 +127,16 @@ node server.js
 ```
 
 Open `http://localhost:3400`. The dashboard reads your local Claude Code transcripts and
-fetches account-level usage by driving `/usage` in a PTY.
+asks the account for its usage figures the same way Claude Code does — `GET /api/oauth/usage`
+with the OAuth token already on your machine. No Claude Code session is started for it.
 
-**First run:** Claude Code trusts folders one at a time, and the trust prompt swallows the
-keystrokes ccfuel types. If the gauge stays empty, run `claude` once inside the ccfuel folder
-and accept, or point `DASHBOARD_CLAUDE_CWD` at a folder you have already trusted. The
-dashboard tells you which of the two it is — see [Troubleshooting](#troubleshooting).
+**First run:** there is nothing to accept on the default path. If the token cannot be read
+(a locked macOS Keychain, or no `~/.claude/.credentials.json`), ccfuel falls back to Claude
+Code's own cached copy of the same reply, and then to driving `/usage` in a PTY. Only that
+last path meets the folder-trust prompt, which swallows the keystrokes it types: run `claude`
+once inside the ccfuel folder and accept, or point `DASHBOARD_CLAUDE_CWD` at a folder you
+already trust. `/api/global-usage` names the source that answered and, on failure, what each
+one said — see [Troubleshooting](#troubleshooting).
 
 ### Take a screenshot without showing your own numbers
 
@@ -174,7 +178,9 @@ node --env-file=.env server.js
 | `DASHBOARD_PORT` | `3400` | Server port |
 | `DASHBOARD_TIMEZONE` | `-5` | UTC offset in hours (`-5` EST, `+1` CET, `0` UTC). No DST. Used by the server, the frontend and the `/usage` reset parser |
 | `DASHBOARD_DATA_DIR` | `./data` | Where snapshots are written. Created on boot if missing |
-| `DASHBOARD_COLLECT_INTERVAL_MIN` | `20` | `/usage` auto-collector cadence in minutes. `0` disables it |
+| `DASHBOARD_COLLECT_INTERVAL_MIN` | `20` | Usage auto-collector cadence in minutes. `0` disables it |
+| `DASHBOARD_USAGE_SOURCE` | `auto` | Where the gauge comes from: `auto` (endpoint → cache → PTY) or one pinned source — `endpoint`, `cache`, `pty` |
+| `DASHBOARD_USAGE_CACHE_MAX_AGE_MIN` | `30` | How old Claude Code's cached usage may be before the `cache` source refuses to serve it as live |
 | `DASHBOARD_CLAUDE_CWD` | *(inherit)* | Folder to spawn `claude` in. Set it to a folder Claude Code already trusts |
 | `DASHBOARD_SESSION_SCAN_INTERVAL_MIN` | `30` | Transcript scan cadence in minutes. `0` disables the "What burned it" panel |
 | `DASHBOARD_SESSION_MIN_FUEL` | `10000` | Sessions under this many fuel tokens are treated as noise |
@@ -186,18 +192,22 @@ node --env-file=.env server.js
 ### Single machine (default)
 
 ```
-Claude Code (/usage PTY)  ──>  claude-usage.js  ──>  server.js  ──>  Dashboard
+usage endpoint  ─┐
+~/.claude.json   ├─>  claude-usage.js  ──>  server.js  ──>  Dashboard
+/usage via PTY  ─┘
 ```
 
-- **claude-usage.js** runs Claude Code's `/usage` command via PTY to get account-level percentages
-- An in-process auto-collector in `server.js` fetches `/usage` and saves a snapshot to `data/usage-curve.json` every `DASHBOARD_COLLECT_INTERVAL_MIN` minutes (default 20), independent of whether the dashboard is open. It primes once ~5s after boot, retries once inside a cycle on failure, and is guarded against overlapping PTY spawns. Opening the dashboard or hitting `/api/global-usage` still triggers an on-demand refresh on top of the schedule.
+- **usage-source.js** reads the account-level percentages without a Claude Code session: the usage endpoint first, then Claude Code's cached copy of the same reply
+- **claude-usage.js** picks the first source that answers and keeps the PTY scrape as the last resort
+- An in-process auto-collector in `server.js` fetches usage and saves a snapshot to `data/usage-curve.json` every `DASHBOARD_COLLECT_INTERVAL_MIN` minutes (default 20), independent of whether the dashboard is open. It primes once ~5s after boot, retries once inside a cycle on failure, and is guarded against overlapping fetches. Opening the dashboard or hitting `/api/global-usage` still triggers an on-demand refresh on top of the schedule.
 
 ### File Structure
 
 ```
 ccfuel/
-├── server.js           # Express server + PTY integration
-├── claude-usage.js     # PTY wrapper for Claude /usage
+├── server.js           # Express server + collector
+├── claude-usage.js     # Source chain (endpoint → cache → PTY) + the PTY scrape itself
+├── usage-source.js     # The two non-interactive readers: usage endpoint and ~/.claude.json
 ├── reset-cycle.js      # Weekly reset cycle validation (guards weekId against misparses)
 ├── session-metrics.js  # Per-session fuel from local transcripts
 ├── public/
@@ -223,7 +233,7 @@ ccfuel/
 |----------|--------|-------------|
 | `/` | GET | Dashboard HTML |
 | `/api/refresh` | GET | Redirects to `/api/global-usage/refresh` |
-| `/api/global-usage` | GET | Real global usage (Claude /usage via PTY) |
+| `/api/global-usage` | GET | Real global usage; `source` names where it came from |
 | `/api/global-usage/refresh` | GET | Force refresh global usage |
 | `/api/usage-curve` | GET | Periodic % snapshots (for weekly comparison) |
 | `/api/usage-deltas` | GET | Derived consumption from % deltas (rate, projection, daily, hourly, heatmap, curves) |
@@ -232,13 +242,17 @@ ccfuel/
 | `/api/session-metrics` | GET | Per-session fuel by project and heaviest sessions (`?window=cycle\|28d\|all`, `?top=N`) |
 | `/api/session-metrics/refresh` | GET | Force a transcript rescan |
 
-**Global Usage:** Executes Claude Code via PTY (~6s on the happy path, 35s hard timeout),
-cached 5 min. Returns `session%`, `weekAll%`, `weekSonnet%`, `extraUsage`.
+**Global Usage:** ~0.7 s on the endpoint path, with no process spawned; the PTY fallback is
+~6 s on the happy path with a 35 s hard timeout. Cached 5 min. Returns `session%`,
+`weekAll%`, `weekSonnet%`, `extraUsage` and `source`.
 
 A read either succeeds or says why. `success: true` means the weekly percentage parsed — the
 one field that is never defaulted, so a real `0%` is distinguishable from a failed read.
-`success: false` carries a `failureKind` (`trust-prompt`, `login-required`, `timeout`,
-`exited-early`) and a message; a failed read never overwrites the last good value.
+`success: false` carries a `failureKind` and a message — `no-oauth-token`,
+`oauth-unauthorized`, `endpoint-http-error`, `endpoint-timeout`, `endpoint-unreachable`,
+`cache-stale`, `cache-absent`, `cache-unreadable` from the non-interactive readers, and
+`trust-prompt`, `login-required`, `timeout`, `exited-early` from the PTY — plus
+`triedSources` when every source failed; a failed read never overwrites the last good value.
 `session.percent` and `weekSonnet.percent` still default to `0` for backwards compatibility,
 so a `0` from those two is not evidence of a real zero.
 
@@ -266,71 +280,79 @@ Two tabs. Everything on the Overview tab is one scrolling page, not separate vie
 
 ### claude-usage.js — The Data Engine
 
-`claude-usage.js` is the **single most critical file** in this project. It is the data extraction layer — without it, the entire dashboard shows 0% on everything. The UI is just presentation; this file is the engine.
+`claude-usage.js` is the **single most critical file** in this project. It is the data
+extraction layer — without it, the entire dashboard shows 0% on everything. The UI is just
+presentation; this file is the engine.
 
 #### How it works
 
+`getClaudeUsage()` takes the first source that answers:
+
 ```
-node-pty spawns `claude` with no MCP servers → retypes `/usage` until the echo appears on
-screen → presses Enter → resolves as soon as parseUsageOutput() succeeds
-→ returns JSON with session%, weekAll%, weekSonnet%
+1. endpoint  GET /api/oauth/usage with the local OAuth token   ~0.7 s, no process spawned
+2. cache     ~/.claude.json → cachedUsageUtilization           free, only while it is fresh
+3. pty       spawn `claude`, type /usage, scrape the panel     ~6 s, 35 s hard timeout
 ```
 
-There is no non-interactive way to get this: the CLI has no `claude usage` subcommand, so
-scraping the TUI is the only route. That makes the spawn the expensive part of the whole
-project, and two decisions keep it honest:
+Claude Code does not compute those percentages either: it asks the account for them and
+caches the reply verbatim. Both non-interactive sources therefore carry the **same JSON
+shape**, so one mapper serves both — and `resets_at` arrives as an instant, which is why
+neither of them has to guess a timezone the way the panel scrape does.
 
-- **No MCP servers** (`--strict-mcp-config` + an empty `--mcp-config`). The session only
-  types a slash command and never calls a tool, but a default spawn boots every MCP server
-  the user has configured. On a host with Playwright MCP that was a second process of
-  ~162 MB per fetch, for nothing.
-- **The two waits that used to break it are now event-driven**: the keystroke is retried until
-  its echo appears on screen, and the fetch resolves when `parseUsageOutput()` succeeds — not
-  when a wording match or a fixed deadline says so. The remaining timers are deliberate and
-  bounded, not guesses about how long the TUI takes: a 4 s delay before the first keystroke, a
-  1.5 s retry interval that stops the moment the echo arrives, a 400 ms pause after the echo so
-  the autocomplete finishes drawing, a 2 s settle after the first successful parse, and the 35 s
-  hard timeout as a backstop. See the history below for why the difference matters.
+`DASHBOARD_USAGE_SOURCE` pins one source when you need to test or diagnose a specific path.
+Every result carries `source`; when all of them fail, `triedSources` says what each one said.
+
+**The credential boundary:** the OAuth token is read (`~/.claude/.credentials.json`, or the
+`Claude Code-credentials` Keychain item on macOS), never written, never logged, and sent
+nowhere but the Anthropic API it already belongs to. `claude` refreshes it on its own
+schedule; an expired one just fails over to the next source.
+
+**The PTY path**, when it runs, spawns with no MCP servers (`--strict-mcp-config` plus an
+empty `--mcp-config`): the session types a slash command and never calls a tool, but a
+default spawn boots every MCP server the user has configured — on a host with Playwright MCP
+that was a second process of ~162 MB per fetch, for nothing. It clears the input line before
+every keystroke attempt and refuses to press Enter on anything but a bare `/usage`; see the
+history below for what that guard is made of.
 
 #### What it costs per fetch
 
-Measured on a 12-core VPS, collector at its default 20-minute interval:
+| | endpoint | PTY fallback |
+|---|---|---|
+| wall time | ~0.7 s | ~6 s happy path, 35 s hard timeout |
+| processes | none | one `claude`, ~327 MB RSS, ~9.7 s CPU |
+| sessions | none | one Claude Code session per fetch |
+| model calls | none — the request asks the account for its own figures | none, as long as nothing but `/usage` reaches the prompt |
 
-| | Value |
-|---|---|
-| process lifetime | ~6 s |
-| RSS | ~327 MB (one process) |
-| CPU (user+sys) | ~9.7 s |
-| tokens | **zero** — `/usage` is a local slash command; no prompt is ever sent to the model |
-
-The RAM figure is a spike, not a leak: the process is killed at the end of each fetch, and
-that kill reaps the child tree with it. Spawning a full CLI is inherent to the approach —
-what is *not* inherent is holding it longer than needed, which is why the early-exit
-condition is load-bearing rather than an optimization.
+PTY figures measured on a 12-core VPS with the collector at its default 20-minute interval.
+The RAM is a spike, not a leak: the process is killed at the end of each fetch and the kill
+reaps the child tree with it.
 
 #### What can break it
 
 | Risk | Detail |
 |------|--------|
-| Claude CLI updates | Output format or slash command behavior may change. Timing changes are now absorbed by the echo/parse gates |
-| `CLAUDE*` env vars | Must be filtered out or Claude refuses to start (nested session detection) |
+| Unreadable token | No `~/.claude/.credentials.json` and a locked Keychain give `failureKind: no-oauth-token`; a rotated or expired one gives `oauth-unauthorized`. Both fall through to the next source |
+| Endpoint shape changes | The mapper reads `five_hour`, `seven_day`, `seven_day_sonnet` and `extra_usage`. A reply without a weekly figure is reported as a failure, never as a `0%` reading |
+| Stale cache | Claude Code's cached copy is only as fresh as the last session that read `/usage` — booting `claude` does not refresh it. Anything older than `DASHBOARD_USAGE_CACHE_MAX_AGE_MIN` is refused rather than served as if it were live |
+| Claude CLI updates | Output format or slash command behavior may change on the PTY path. Timing changes are absorbed by the echo/parse gates |
+| `CLAUDE*` env vars | Must be filtered out of the PTY spawn or Claude refuses to start (nested session detection) |
 | Matching the TUI's **wording** | The early-exit condition must key off the *parse succeeding*, never off a specific string. A wording match that silently stops matching does not fail loudly — it degrades into "always hits the 35s timeout" while still returning correct data |
 | Startup flags | `--bare` looks ideal and is not: it ignores OAuth and the keychain by design (API key only), which breaks the very subscription quota this reads. `--disable-slash-commands` disables the one thing the fetch does |
-| Timeout (35s) | Now a genuine backstop rather than the normal path. A fetch that reaches it means `/usage` never rendered; the raw buffer is dumped to the log so it can be diagnosed |
 | Folder trust | Claude Code trusts folders one at a time and asks before working in an unknown one. That prompt eats the keystrokes. Detected by name (`failureKind: trust-prompt`) and never answered automatically — accepting a trust prompt is the user's decision, not a dashboard's |
 | node-pty packaging | It is a Node-API addon, so one binary works across Node versions — no rebuild after a Node upgrade. The real trap is macOS: the published prebuild's `spawn-helper` is not executable, and every spawn then fails with `posix_spawnp failed.` A `postinstall` restores the bit; see `scripts/fix-pty-permissions.js` |
 
 #### Rules before modifying
 
-1. **Always run `node claude-usage.js --debug` first**
-2. **Check `/tmp/claude-usage-debug.log`** for raw PTY output if something looks wrong
-3. **If `/usage` output format changes**, only `parseUsageOutput()` needs updating — PTY spawn logic should remain stable
-4. **Test from PM2 context too** — env vars differ between interactive shell and PM2
+1. **Run `node claude-usage.js` first** — it prints the result and the `source` that produced it
+2. **To exercise one path, pin it**: `DASHBOARD_USAGE_SOURCE=pty node claude-usage.js --debug`, with the raw PTY capture in `/tmp/claude-usage-debug.log`
+3. **If the `/usage` panel changes**, only `parseUsageOutput()` needs updating; if the endpoint payload changes, only `mapUtilization()` does. The spawn logic and the source chain stay put
+4. **Nothing typed into the PTY may ever reach the model.** The line is cleared before every attempt and Enter is refused unless the input is exactly `/usage` — keep both if you touch the typing
+5. **Test from PM2 context too** — env vars differ between an interactive shell and PM2
 
 #### History
 
 - **Pre-2026-03-01:** Used `execSync('claude usage')` which was never a valid CLI command. Worked by accident until it stopped.
-- **2026-03-01:** Rewritten to use node-pty with interactive `/usage` slash command.
+- **2026-03-01:** Rewritten to use node-pty with the interactive `/usage` slash command.
 - **2026-08-08:** Cut from 35 s to ~6 s per fetch. Three findings worth keeping, because each
   one hid behind correct-looking output:
   - The early-exit condition required the string `extra usage`, which that account's panel
@@ -343,6 +365,17 @@ condition is load-bearing rather than an optimization.
     ~15 % failure — not an expired login. The fix is to retype until the echo appears.
   - The spawn loaded every configured MCP server (523 MB, two processes) to type one slash
     command it never used a tool for.
+- **2026-08-29 ([#55](https://github.com/ronaldmego/ccfuel/issues/55)):** the retype fix above
+  had a race with the 4 s timer: when the echo landed just before it, a second `/usage` was
+  typed onto the same line. `/usage/usage` is not a slash command, so Enter submitted it as a
+  **prompt** — a real agent turn, on the plan the gauge exists to watch, roughly a quarter of
+  all fetches for three weeks. Two conclusions, both shipped:
+  - a guard where the damage happens: the line is cleared before every keystroke, and Enter
+    is refused on anything but a bare `/usage`. Whatever puts stray text on that line, it can
+    no longer become a prompt;
+  - and the honest fix, because the fragility was never in the timers but in driving a TUI at
+    all: read the same figures Claude Code reads. `README`, `CONTRIBUTING` and
+    `TECHNICAL-NOTES` all said there was no non-interactive way to get them. There is.
 
 ## Troubleshooting
 

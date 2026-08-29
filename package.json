@@ -11,7 +11,7 @@
     "dev": "node server.js",
     "demo": "node scripts/demo.js",
     "postinstall": "node scripts/fix-pty-permissions.js",
-    "test": "node test/claims.test.js && node test/reset-cycle.test.js && node test/session-metrics.test.js && node test/session-scan.test.js && node test/usage-parse.test.js && node test/fixture-clock.test.js && node test/pty-smoke.test.js && node test/server-smoke.test.js && node test/demo-entrypoint.test.js"
+    "test": "node test/claims.test.js && node test/reset-cycle.test.js && node test/session-metrics.test.js && node test/session-scan.test.js && node test/usage-parse.test.js && node test/usage-source.test.js && node test/fixture-clock.test.js && node test/pty-smoke.test.js && node test/server-smoke.test.js && node test/demo-entrypoint.test.js"
   },
   "dependencies": {
     "chart.js": "4.5.1",

@@ -22,7 +22,7 @@ Si miras `totalTokens` directamente:
 
 | | Fuente | Responde | Estatus |
 |---|---|---|---|
-| **Medidor oficial** | Claude `/usage` via PTY | **cuanto** de la cuota se fue | Autoritativo — el numero de Anthropic |
+| **Medidor oficial** | Las cifras de la cuenta, leidas como las lee Claude Code | **cuanto** de la cuota se fue | Autoritativo — el numero de Anthropic |
 | **Proxy local de fuel** | Los transcripts de sesion | **donde** se concentro el trabajo no-cache | Heuristica de ccfuel. No es una formula de Anthropic |
 
 El % de `/usage` es la **unica fuente de verdad para la cuota** (`claude-usage.js`). El proxy no
@@ -95,7 +95,7 @@ Tanto `server.js` como `index.html` usan esta misma logica (ver `getWeekCycleInf
 
 ### Parsing de resets: por seccion, no por posicion
 
-El parser PTY (`claude-usage.js`) extrae 3 resets del output de `/usage`. Cada tipo (session, weekAll, weekSonnet) tiene su propio formato y ventana de tiempo.
+Esto aplica al **fallback PTY**: por defecto los resets llegan ya como instantes ISO desde `/api/oauth/usage` y no hay nada que parsear (ver `usage-source.js`). El parser PTY (`claude-usage.js`) extrae 3 resets del output de `/usage`. Cada tipo (session, weekAll, weekSonnet) tiene su propio formato y ventana de tiempo.
 
 **Metodo:** El texto limpio del PTY se divide en secciones usando los headers "Current session", "Current week (all models)", "Current week (Sonnet only)". Cada seccion se parsea independientemente para su porcentaje y tiempo de reset. Esto evita que un reset no-parseado desplace a los demas.
 
@@ -281,7 +281,7 @@ El % de Claude `/usage` es **account-level** — incluye todo el consumo indepen
 | API calls directas | Si | Misma cuenta |
 | Cursor, Continue, etc. | Si | Si usan la misma cuenta |
 
-Esta es la ventaja principal del enfoque PTY: el % oficial ya incluye todo, sin necesidad de parsear logs individuales.
+Esta es la ventaja principal de leer el medidor oficial en vez de reconstruirlo: el % ya incluye todo, sin necesidad de parsear logs individuales.
 
 ---
 
