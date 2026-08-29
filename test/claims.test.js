@@ -41,6 +41,7 @@ const SURFACE = [
   'public/index.html',
   'session-metrics.js',
   'claude-usage.js',
+  'usage-source.js',
   'server.js'
 ];
 

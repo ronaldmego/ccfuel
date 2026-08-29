@@ -4,20 +4,24 @@ Technical limitations of the dashboard and its data sources.
 
 ---
 
-## Data Extraction: PTY Dependency (CRITICAL)
+## Data Extraction: where the gauge comes from
 
-The dashboard's **sole data source** is the `/usage` slash command inside Claude Code, accessed via a PTY (pseudo-terminal) session using `node-pty`.
+The account-level percentages come from the first source that answers: the usage endpoint,
+then Claude Code's cached copy of that same reply, then the `/usage` panel scraped from a PTY.
 
-### Why PTY (not CLI, not API, not OTel)
-
-| Alternative | Viable? | Reason |
+| Source | Viable? | Reason |
 |-------------|---------|--------|
+| `GET /api/oauth/usage` | Yes, default | The call Claude Code itself makes. Structured JSON, `resets_at` as an instant, ~0.7 s, no process spawned. Needs the local OAuth token |
+| `~/.claude.json` → `cachedUsageUtilization` | Yes, when fresh | Claude Code's verbatim copy of the same payload. No credentials, no network — but only as fresh as the last session that opened `/usage`, so a stale one is refused rather than served |
+| Claude `/usage` via PTY | Yes, last resort | Works with no token at all, at the cost of booting a CLI and screen-scraping a TUI. See the risks below |
 | `claude usage` CLI subcommand | No | Does not exist — Claude interprets it as a chat prompt |
-| Anthropic API | No | No endpoint for account quota % |
 | OpenTelemetry | Partial | Exports tokens/costs per request, but NOT weekly quota % (the primary metric). Investigated 2026-03-01, not viable as replacement |
-| Claude `/usage` via PTY | Yes | Only source of `weekAll.percent`, `session.percent`, `weekSonnet.percent` |
 
-### Risks
+Note that the endpoint is not a documented public API: it is what the CLI uses, and it can
+change without notice. That is precisely why the other two sources are kept behind it, and
+why a reply without a weekly figure is reported as a failure instead of a `0%` reading.
+
+### Risks of the PTY fallback
 
 - **Fragile:** the whole read is screen-scraping a TUI. Claude CLI updates can change the
   panel's wording or layout and break `parseUsageOutput()`. The two waits that used to break on
@@ -28,7 +32,13 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
   backstops and debounces rather than bets on how long the TUI needs, so a slower machine
   degrades instead of failing.
 - **Costly per fetch:** ~6 s of process lifetime and ~327 MB RSS on the happy path — a whole
-  CLI is booted to type one slash command. Zero tokens: `/usage` is local.
+  CLI is booted to type one slash command.
+- **Anything typed into it is one keystroke away from being a prompt.** A retype race once
+  left `/usage/usage` on the input line; that is not a slash command, so Enter submitted it
+  and started a billed agent turn, ~26% of fetches for three weeks
+  ([#55](https://github.com/ronaldmego/ccfuel/issues/55)). The line is now cleared before
+  every attempt and Enter is refused on anything but a bare `/usage`, but the class of risk
+  is inherent to driving a TUI — which is why this path is no longer the default.
 - **One at a time:** Cannot run multiple PTY sessions simultaneously (Claude detects and rejects).
 - **Env-sensitive:** all `CLAUDE*` env vars must be filtered or Claude refuses to start
   (nested-session detection).
@@ -43,13 +53,24 @@ The dashboard's **sole data source** is the `/usage` slash command inside Claude
 
 ### Mitigation
 
-- 5-minute cache on successful fetches (avoids hammering PTY)
+- Three sources tried in order, so one failing does not blank the gauge; the answer carries
+  `source`, and a total failure carries `triedSources` with what each one said
+- 5-minute cache on successful fetches
 - 35-second timeout with graceful fallback, plus one retry inside the same collector cycle
 - **A failed/timed-out fetch keeps the last good cached value** — a transient PTY timeout never overwrites real usage with `0%` (see Historical bug below)
-- Failures are named, not generic: `failureKind` is one of `trust-prompt`, `login-required`,
+- Failures are named, not generic: `failureKind` is one of `no-oauth-token`,
+  `oauth-unauthorized`, `endpoint-http-error`, `endpoint-timeout`, `endpoint-unreachable`,
+  `cache-stale`, `cache-absent`, `cache-unreadable`, `trust-prompt`, `login-required`,
   `timeout`, `exited-early`. The first two are detected during boot and end the fetch
   immediately instead of spending the full 35 s on a state no retry can clear.
 - Debug mode: `node claude-usage.js --debug` writes raw output to `/tmp/claude-usage-debug.log`
+
+### The endpoint carries no "$N free" figure
+
+The `/usage` panel prints a promotional "$N free" line that the endpoint payload has no field
+for (`extra_usage` describes a paid budget, not a grant). On the endpoint and cache paths the
+badge therefore stays off — `extraUsage.freeAvailable` is `0` — rather than showing a number
+ccfuel would have to invent. `extraUsage.enabled` is read correctly on every path.
 
 ### Historical bug: transient PTY timeout read as 0% (#34)
 

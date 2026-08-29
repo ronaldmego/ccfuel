@@ -2,9 +2,9 @@
 
 ## Scope and data handling
 
-ccfuel runs **locally** and reads your own Claude Code logs (`~/.claude`) plus the CLI's built-in `/usage` output. It does not transmit your data anywhere — there is no backend service, no telemetry, and no third-party calls beyond running your local `claude` binary.
+ccfuel runs **locally** and reads your own Claude Code logs (`~/.claude`) plus your account's usage figures. It does not transmit your data anywhere — there is no backend service, no telemetry, and no third-party calls beyond the one Anthropic endpoint described below.
 
-- **No secrets required.** ccfuel does not need or store any API key or token. It relies on your already-authenticated Claude Code CLI.
+- **It stores no secret, and reads one.** ccfuel has no API key of its own. To read the gauge it uses the OAuth token your Claude Code CLI already keeps on this machine (`~/.claude/.credentials.json`, or the `Claude Code-credentials` Keychain item on macOS): read only, never written, never logged, never persisted by ccfuel, and sent nowhere but `api.anthropic.com` — the same call the CLI makes for its own `/usage` panel. If you would rather it never touch the token, set `DASHBOARD_USAGE_SOURCE=cache` (Claude Code's own cached copy) or `=pty` (drive the CLI instead).
 - **Bind address.** By default the server binds to `127.0.0.1` (localhost only). Only change `DASHBOARD_HOST` if you intentionally want to expose it on a trusted private network (e.g. a VPN). Never bind it to a public interface.
 - **Local data stays local.** Snapshots are written to `data/` (gitignored). Don't commit them.
 - **The dashboard page loads nothing from the internet.** Every asset comes from this server: the
@@ -27,7 +27,8 @@ Being precise, since "runs locally" is the whole claim:
 | When | What | Why |
 |---|---|---|
 | `npm ci` / `npm install` | the npm registry | Installing dependencies. Build time, not runtime — and pinned by `package-lock.json` |
-| Every `/usage` fetch | your local `claude` binary, which talks to Anthropic as it normally does | ccfuel spawns the CLI; the CLI's own network behaviour is unchanged and is not ccfuel's traffic |
+| Every usage fetch (default) | `GET https://api.anthropic.com/api/oauth/usage`, with your Claude Code OAuth token | Asking your own account for its own quota figures. Nothing about your transcripts, projects or prompts is sent — the request carries the token and nothing else |
+| A usage fetch on the PTY fallback | your local `claude` binary, which talks to Anthropic as it normally does | ccfuel spawns the CLI; the CLI's own network behaviour is unchanged and is not ccfuel's traffic |
 | Anything else | nothing | No telemetry, no analytics, no update check, no crash reporting |
 
 ## Reporting a vulnerability

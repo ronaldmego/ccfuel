@@ -1,9 +1,22 @@
-// Claude Usage via PTY (interactive)
-// Spawns claude interactively, sends /usage slash command, parses output.
-// Requires node-pty — a declared dependency in package.json.
+// Claude usage — the source chain.
+//
+// `getClaudeUsage()` reads the plan gauge from the first source that answers:
+//
+//   1. endpoint — GET /api/oauth/usage, the same call Claude Code makes. No session, no
+//      plan quota, no parsing (see usage-source.js).
+//   2. cache    — Claude Code's own copy of that reply in ~/.claude.json, when it is fresh.
+//   3. pty      — the historical path: spawn `claude`, type /usage, scrape the panel. Kept
+//      as a last resort for hosts where neither of the above can be read.
+//
+// The PTY path is the fragile one and it is the one that bit us: a keystroke retry could
+// leave `/usage/usage` on the input line, which is not a slash command, so Enter submitted
+// it as a prompt and started a billed agent turn — 395 of them in three weeks (#55). It now
+// clears the line before every attempt and refuses to press Enter on anything but the bare
+// slash command.
 
 const pty = require('node-pty');
 const fs = require('fs');
+const { fetchUsageFromEndpoint, readCachedUtilization } = require('./usage-source');
 
 // UTC offset in hours used to turn the wall-clock time printed by /usage ("resets 10am")
 // into a real instant. Same variable the server and the frontend read, so a single setting
@@ -39,6 +52,10 @@ const BLOCKERS = [
   }
 ];
 
+// Ctrl+U: clear the input line. Sent before every keystroke attempt so two attempts can
+// never concatenate into `/usage/usage` (#55).
+const CLEAR_INPUT_LINE = '\x15';
+
 function stripAnsi(raw) {
   return raw
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ' ')
@@ -48,7 +65,23 @@ function stripAnsi(raw) {
     .replace(/\s+/g, ' ');
 }
 
-function getClaudeUsage(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
+/**
+ * True when the visible input line has accumulated more than one `/usage`.
+ *
+ * Only the current input line is inspected: the buffer keeps every redraw of the session, so
+ * a doubled line that has since been cleared must not block the fetch forever — after a
+ * clear+retype the prompt marker moves past it. The slash-command menu lists `/usage` and
+ * `/usage-credits` with their descriptions in between, which is why adjacency — not a count
+ * — is what this looks for.
+ */
+function isDoubledUsageInput(output, tailChars = 400) {
+  const tail = stripAnsi(output).slice(-tailChars);
+  const promptAt = tail.lastIndexOf('\u276f');   // ❯, the TUI's input marker
+  const line = promptAt >= 0 ? tail.slice(promptAt) : tail;
+  return /\/usage\s*\/usage/.test(line);
+}
+
+function getUsageViaPty(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
   return new Promise((resolve) => {
     let output = '';
     let settled = false;
@@ -59,6 +92,15 @@ function getClaudeUsage(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
 
     const pressEnter = () => {
       if (settled || enterSent) return;
+      // Last line of defence, independent of whatever race put the text there: never submit
+      // anything but the slash command itself. A doubled line is retyped, not sent — sending
+      // it costs plan quota and opens an agent turn nobody asked for (#55).
+      if (isDoubledUsageInput(output)) {
+        if (debug) console.log('Input line shows a repeated /usage — clearing instead of submitting');
+        enterScheduled = false;
+        term.write(CLEAR_INPUT_LINE + '/usage');
+        return;
+      }
       enterSent = true;
       if (typeRetry) clearInterval(typeRetry);
       term.write('\r');
@@ -196,13 +238,24 @@ function getClaudeUsage(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
     // A keystroke into a TUI that is not listening leaves no error to react to, so
     // the only reliable signal is the echo itself: retype until /usage appears on
     // screen, and only then press Enter.
-    const typeUsage = () => { if (!settled && !enterSent) term.write('/usage'); };
-    setTimeout(typeUsage, 4000);
-    typeRetry = setInterval(() => {
-      if (settled || enterSent || output.includes('/usage')) { clearInterval(typeRetry); return; }
-      if (debug) console.log('Echo de /usage aun ausente — reintentando la tecla');
+    // Every attempt clears the line first: a retry that lands after the previous keystrokes
+    // finally echoed used to leave `/usage/usage` in the box (#55).
+    const typeUsage = () => {
+      if (settled || enterSent) return;
+      term.write(CLEAR_INPUT_LINE + '/usage');
+    };
+    // The retry starts after the first attempt, not alongside it. Starting the interval at
+    // t=0 fired two attempts *before* the initial one, into a TUI that was usually not
+    // listening yet — which is what made the echo land inside the window where the 4 s timer
+    // typed a second copy.
+    setTimeout(() => {
       typeUsage();
-    }, 1500);
+      typeRetry = setInterval(() => {
+        if (settled || enterSent || output.includes('/usage')) { clearInterval(typeRetry); return; }
+        if (debug) console.log('/usage has not echoed yet — retyping');
+        typeUsage();
+      }, 1500);
+    }, 4000);
   });
 }
 
@@ -314,6 +367,7 @@ function parseUsageOutput(output, tzOffset = DEFAULT_TZ_OFFSET) {
     // Require weekAll to have parsed — a read that couldn't produce the weekly
     // percent is not a usable snapshot (#35). A real 0% still parses (percent === 0).
     success: boundaries.length >= 2 && weekAll.percent != null,
+    source: 'pty',
     timestamp: new Date().toISOString(),
     // Debug-only: the ANSI-stripped raw text, so a suspect read (e.g. a sustained
     // drop) can be diagnosed from evidence. The caller logs it conditionally and
@@ -341,11 +395,68 @@ function parseUsageOutput(output, tzOffset = DEFAULT_TZ_OFFSET) {
   };
 }
 
-module.exports = { getClaudeUsage, parseUsageOutput, stripAnsi, BLOCKERS };
+// Which sources to try, in order. `DASHBOARD_USAGE_SOURCE` pins one for debugging or for a
+// host where a given path is known to be wrong.
+const SOURCE_ORDER = {
+  auto: ['endpoint', 'cache', 'pty'],
+  endpoint: ['endpoint'],
+  cache: ['cache'],
+  pty: ['pty']
+};
+
+/**
+ * The plan gauge, from the cheapest source that can answer.
+ *
+ * Returns the same shape on every path, plus `source` naming the one that produced it. On
+ * total failure the last error is returned with `triedSources` listing what each one said,
+ * so a dead gauge names its cause instead of just timing out.
+ */
+async function getClaudeUsage(debug = false, {
+  tzOffset = DEFAULT_TZ_OFFSET,
+  source = process.env.DASHBOARD_USAGE_SOURCE || 'auto'
+} = {}) {
+  const key = String(source).toLowerCase();
+  const order = SOURCE_ORDER[key];
+  if (!order) {
+    console.warn(`[ccfuel] Unknown DASHBOARD_USAGE_SOURCE "${source}" — using auto `
+      + `(${Object.keys(SOURCE_ORDER).join(', ')}).`);
+    return getClaudeUsage(debug, { tzOffset, source: 'auto' });
+  }
+
+  const tried = [];
+  let result = null;
+  for (const candidate of order) {
+    if (candidate === 'endpoint') result = await fetchUsageFromEndpoint({ tzOffset });
+    else if (candidate === 'cache') result = readCachedUtilization({ tzOffset });
+    else result = await getUsageViaPty(debug, { tzOffset });
+
+    if (result.success) {
+      if (tried.length) {
+        console.warn(`[ccfuel] usage read from ${candidate} after ${tried.join(' | ')}`);
+      }
+      return result;
+    }
+    tried.push(`${candidate}: ${result.failureKind || 'failed'}`);
+  }
+
+  return { ...result, triedSources: tried, errorMessage: `${result.errorMessage || 'usage read failed'}`
+    + (tried.length > 1 ? ` (tried ${tried.join(' | ')})` : '') };
+}
+
+module.exports = {
+  getClaudeUsage,
+  getUsageViaPty,
+  parseUsageOutput,
+  stripAnsi,
+  isDoubledUsageInput,
+  BLOCKERS,
+  SOURCE_ORDER
+};
 
 if (require.main === module) {
   const debug = process.argv.includes('--debug');
-  console.log('Testing Claude usage fetch via PTY...' + (debug ? ' (debug mode)' : ''));
+  console.log('Testing Claude usage fetch...' + (debug ? ' (debug mode)' : '')
+    + ` [source: ${process.env.DASHBOARD_USAGE_SOURCE || 'auto'}]`);
   getClaudeUsage(debug)
     .then(result => {
       console.log('\n=== RESULT ===');
