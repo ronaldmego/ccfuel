@@ -11,7 +11,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 
-const { mapUtilization, fetchUsageFromEndpoint, readCachedUtilization } = require('../usage-source');
+const { mapUtilization, fetchUsageFromEndpoint, readCachedUtilization, snapToMinute } = require('../usage-source');
 const { isDoubledUsageInput } = require('../claude-usage');
 
 const cases = [];
@@ -22,10 +22,12 @@ const iso = (ms) => new Date(ms).toISOString();
 
 /** A payload shaped like /api/oauth/usage, with resets a fixed distance from `now`. */
 function payload(now, { five = 41.4, seven = 58.6, sonnet = null, extra = false } = {}) {
+  // Minute-aligned, so the assertions can compare instants exactly (the mapper snaps, see #59).
+  const at = (offset) => iso(snapToMinute(now) + offset);
   return {
-    five_hour: { utilization: five, resets_at: iso(now + 2 * HOUR) },
-    seven_day: { utilization: seven, resets_at: iso(now + 50 * HOUR) },
-    seven_day_sonnet: sonnet == null ? null : { utilization: sonnet, resets_at: iso(now + 50 * HOUR) },
+    five_hour: { utilization: five, resets_at: at(2 * HOUR) },
+    seven_day: { utilization: seven, resets_at: at(50 * HOUR) },
+    seven_day_sonnet: sonnet == null ? null : { utilization: sonnet, resets_at: at(50 * HOUR) },
     extra_usage: { is_enabled: extra }
   };
 }
@@ -45,6 +47,28 @@ test('resetsAt is an instant, resetsAtHour is that instant in the display zone',
   // now + 2h = 14:00 UTC = 09:00 at UTC-5.
   return r.session.resetsAt === iso(now + 2 * HOUR) && r.session.resetsAtHour === 9;
 });
+
+// #59: the API jitters either side of the boundary, and at UTC−5 a hair before midnight UTC
+// belongs to the previous day. Both readings of the same reset must render identically.
+test('sub-second jitter around the boundary does not flip the day or the hour', () => {
+  const now = Date.UTC(2026, 7, 29, 12, 0, 0);
+  const midnightUtc5 = Date.UTC(2026, 8, 1, 5, 0, 0);   // Sep 1, 12:00am at UTC-5
+  const read = (resets_at) => mapUtilization(
+    { seven_day: { utilization: 60, resets_at } }, { tzOffset: -5, now }).weekAll;
+
+  const late = read(new Date(midnightUtc5 + 287).toISOString());
+  const early = read(new Date(midnightUtc5 - 7).toISOString());
+
+  return late.resetsAt === early.resetsAt
+    && late.resetsAt === new Date(midnightUtc5).toISOString()
+    && late.resetsAtHour === 0 && early.resetsAtHour === 0;
+});
+
+test('snapToMinute rounds to the nearest minute, both directions', () =>
+  snapToMinute(Date.UTC(2026, 0, 1, 5, 0, 0, 287)) === Date.UTC(2026, 0, 1, 5, 0, 0)
+  && snapToMinute(Date.UTC(2026, 0, 1, 4, 59, 59, 993)) === Date.UTC(2026, 0, 1, 5, 0, 0)
+  && snapToMinute(Date.UTC(2026, 0, 1, 5, 0, 29, 0)) === Date.UTC(2026, 0, 1, 5, 0, 0)
+  && snapToMinute(Date.UTC(2026, 0, 1, 5, 0, 31, 0)) === Date.UTC(2026, 0, 1, 5, 1, 0));
 
 test('a reset already in the past is dropped rather than shown as a negative countdown', () => {
   const now = Date.now();

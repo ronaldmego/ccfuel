@@ -61,9 +61,19 @@ function readOAuthToken() {
 }
 
 /** Hour of the day the instant falls on, in the zone the dashboard displays. */
-function localHour(iso, tzOffset) {
-  const d = new Date(new Date(iso).getTime() + tzOffset * 60 * 60 * 1000);
-  return d.getUTCHours();
+function localHour(ms, tzOffset) {
+  return new Date(ms + tzOffset * 60 * 60 * 1000).getUTCHours();
+}
+
+// The API returns `resets_at` with microsecond precision, and not always on the same side of
+// the minute: `05:00:00.287494Z` on one read, `04:59:59.993000Z` on the next. Quota windows
+// roll on whole minutes, so that tail is noise — and not harmless noise: at UTC−5,
+// `04:59:59.993Z` is 23:59 of the *previous day*, which flips the printed label, the hour and
+// the cycle range the dashboard draws (#59). Snapping to the nearest minute makes two reads
+// of the same reset render identically, and matches what the /usage panel prints.
+const MINUTE_MS = 60000;
+function snapToMinute(ms) {
+  return Math.round(ms / MINUTE_MS) * MINUTE_MS;
 }
 
 function mapSection(entry, tzOffset, now) {
@@ -78,8 +88,9 @@ function mapSection(entry, tzOffset, now) {
     // the new one. Reporting it would render as a negative countdown, so drop it — the same
     // rule the PTY parser applies.
     if (!Number.isNaN(at.getTime()) && at.getTime() > now) {
-      resetsAt = at.toISOString();
-      resetsAtHour = localHour(entry.resets_at, tzOffset);
+      const ms = snapToMinute(at.getTime());
+      resetsAt = new Date(ms).toISOString();
+      resetsAtHour = localHour(ms, tzOffset);
     }
   }
   return { percent: Math.round(entry.utilization), resetsAtHour, resetsAt };
@@ -218,6 +229,7 @@ function readCachedUtilization({
 
 module.exports = {
   mapUtilization,
+  snapToMinute,
   fetchUsageFromEndpoint,
   readCachedUtilization,
   readOAuthToken,

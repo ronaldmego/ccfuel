@@ -332,6 +332,7 @@ reaps the child tree with it.
 | Risk | Detail |
 |------|--------|
 | Unreadable token | No `~/.claude/.credentials.json` and a locked Keychain give `failureKind: no-oauth-token`; a rotated or expired one gives `oauth-unauthorized`. Both fall through to the next source |
+| Sub-second jitter in `resets_at` | The API returns the reset with microsecond precision, either side of the minute (`05:00:00.287Z`, then `04:59:59.993Z`). At a negative offset the second one is 23:59 of the previous day, which would flip the label, the hour and the cycle range between two reads of the same window. The mapper snaps the instant to the nearest minute ([#59](https://github.com/ronaldmego/ccfuel/issues/59)) |
 | Endpoint shape changes | The mapper reads `five_hour`, `seven_day`, `seven_day_sonnet` and `extra_usage`. A reply without a weekly figure is reported as a failure, never as a `0%` reading |
 | Stale cache | Claude Code's cached copy is only as fresh as the last session that read `/usage` — booting `claude` does not refresh it. Anything older than `DASHBOARD_USAGE_CACHE_MAX_AGE_MIN` is refused rather than served as if it were live |
 | Claude CLI updates | Output format or slash command behavior may change on the PTY path. Timing changes are absorbed by the echo/parse gates |
