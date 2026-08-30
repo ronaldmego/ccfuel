@@ -296,8 +296,25 @@ presentation; this file is the engine.
 
 Claude Code does not compute those percentages either: it asks the account for them and
 caches the reply verbatim. Both non-interactive sources therefore carry the **same JSON
-shape**, so one mapper serves both — and `resets_at` arrives as an instant, which is why
-neither of them has to guess a timezone the way the panel scrape does.
+shape**, so one mapper serves both. The reply *is* the answer — percentages that are already
+numbers, resets that are already instants (figures below invented):
+
+```json
+{
+  "five_hour": { "utilization": 41.4, "resets_at": "2026-01-15T20:10:00.287494+00:00" },
+  "seven_day": { "utilization": 58.6, "resets_at": "2026-01-18T05:00:00.287518+00:00" }
+}
+```
+
+**Why that path is a second and the scrape is six.** Reading the panel meant booting a whole
+CLI (~4 s before the TUI even accepts a keystroke), waiting for it to paint, stripping the
+terminal's control codes out of the capture, and then *inferring* what the text meant: a
+percentage from `41% used`, and a date from a bare wall-clock time like `resets 10am`, which
+names neither the day nor the zone. Half the historical bugs in this file live in that last
+step. Asking the account instead is one HTTPS request and its reply: nothing to boot, nothing
+to paint, nothing to clean, nothing to infer. The only massaging left is snapping `resets_at`
+to the nearest minute, because the API's sub-second tail jitters either side of the boundary
+(see the risk table below).
 
 `DASHBOARD_USAGE_SOURCE` pins one source when you need to test or diagnose a specific path.
 Every result carries `source`; when all of them fail, `triedSources` says what each one said.
