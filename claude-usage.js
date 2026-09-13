@@ -81,6 +81,30 @@ function isDoubledUsageInput(output, tailChars = 400) {
   return /\/usage\s*\/usage/.test(line);
 }
 
+// The flags the PTY fallback boots `claude` with. Each one is here because its absence cost
+// something real, and dropping one fails silently — the fetch still works, it just starts
+// costing again — so the tests pin them.
+//
+// No MCP servers: this session only types a slash command and never calls a tool, but a
+// default spawn still boots every configured MCP server. Measured on a host with Playwright
+// MCP configured: 523 MB / 14.24s CPU per fetch with them, 327 MB / 8.86s without, and the
+// usage panel renders at the same time (5.9s vs 5.8s) — they were pure overhead, not latency
+// we were buying.
+//
+// No Remote Control: Claude Code can start every interactive session under Remote Control,
+// and where it does, this spawn was listed in the user's Claude apps as a remote session — a
+// new one each time the endpoint answered 429 or 401 and the chain fell through to here
+// (#61). An explicit `false` overrides that default for this process only; the user's own
+// sessions keep whatever they had.
+//
+// NOT `--bare`, tempting as it looks: it ignores OAuth and the keychain by design (API key
+// only), which would break the very subscription quota this reads. Nor
+// `--disable-slash-commands` — the whole fetch is typing /usage.
+const PTY_CLAUDE_ARGS = [
+  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--settings', '{"remoteControlAtStartup":false}'
+];
+
 function getUsageViaPty(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
   return new Promise((resolve) => {
     let output = '';
@@ -113,16 +137,7 @@ function getUsageViaPty(debug = false, { tzOffset = DEFAULT_TZ_OFFSET } = {}) {
       )
     );
 
-    // No MCP servers: this session only types a slash command and never calls a
-    // tool, but a default spawn still boots every configured MCP server. Measured
-    // on a host with Playwright MCP configured: 523 MB / 14.24s CPU per fetch with
-    // them, 327 MB / 8.86s without, and the usage panel renders at the same time
-    // (5.9s vs 5.8s) — they were pure overhead, not latency we were buying.
-    //
-    // NOT `--bare`, tempting as it looks: it ignores OAuth and the keychain by
-    // design (API key only), which would break the very subscription quota this
-    // reads. Nor `--disable-slash-commands` — the whole fetch is typing /usage.
-    const term = pty.spawn('claude', ['--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}'], {
+    const term = pty.spawn('claude', PTY_CLAUDE_ARGS, {
       name: 'xterm',
       cols: 200,
       rows: 50,
@@ -449,6 +464,7 @@ module.exports = {
   parseUsageOutput,
   stripAnsi,
   isDoubledUsageInput,
+  PTY_CLAUDE_ARGS,
   BLOCKERS,
   SOURCE_ORDER
 };
