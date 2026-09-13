@@ -4,6 +4,7 @@ const fs = require('fs');
 const { getClaudeUsage } = require('./claude-usage');
 const { isPlausibleWeeklyReset } = require('./reset-cycle');
 const sessionMetrics = require('./session-metrics');
+const { createRateLimitWatch, runNotifyCommand } = require('./rate-limit-watch');
 
 const app = express();
 
@@ -35,6 +36,12 @@ try {
 const COLLECT_INTERVAL_MIN = DEMO
   ? 0
   : parseInt(process.env.DASHBOARD_COLLECT_INTERVAL_MIN || '20', 10);
+
+// Rate-limit alerts (#66). The command runs on each episode transition with the event as JSON
+// on stdin; empty keeps it off. Never in demo mode, which collects nothing to alert on.
+const NOTIFY_CMD = DEMO ? '' : (process.env.DASHBOARD_NOTIFY_CMD || '').trim();
+const NOTIFY_COOLDOWN_MIN = parseInt(process.env.DASHBOARD_NOTIFY_COOLDOWN_MIN || '60', 10);
+const rateLimitWatch = createRateLimitWatch({ cooldownMs: NOTIFY_COOLDOWN_MIN * 60 * 1000 });
 const WEEKLY_HISTORY_FILE = path.join(DATA_DIR, 'weekly-history.json');
 const USAGE_CURVE_FILE = path.join(DATA_DIR, 'usage-curve.json');
 // Only read in demo mode, where there is no PTY to produce a live gauge.
@@ -823,6 +830,21 @@ app.get('/api/session-metrics/refresh', async (req, res) => {
 
 // === Collection core (shared by the HTTP endpoint and the auto-collector) ===
 
+// The log line is the record either way; the hook is how an operator hears about it.
+// Fire-and-forget: a slow or broken hook must never hold up a collection.
+function announceRateLimit(event) {
+  if (!event) return;
+  const payload = { ...event, host: require('os').hostname() };
+  console.warn(`🚦 [rate-limit] ${event.event}`, JSON.stringify(payload));
+  if (!NOTIFY_CMD) return;
+  runNotifyCommand(NOTIFY_CMD, payload).then((r) => {
+    if (!r.ok) {
+      console.error(`❌ DASHBOARD_NOTIFY_CMD failed on ${event.event}:`,
+        r.error || (r.timedOut ? 'timed out' : `exit ${r.code}`), r.stderr || '');
+    }
+  });
+}
+
 // Fetch /usage via PTY, refresh the cache, and persist snapshots.
 // Throws on PTY/spawn failure so callers can decide how to report it.
 // Callers MUST hold the `globalUsageCache.fetching` guard to avoid overlapping
@@ -838,6 +860,10 @@ async function fetchAndSnapshot({ retryOnFailure = false } = {}) {
     console.warn('🔁 /usage fetch failed — retrying once in this cycle');
     usage = await getClaudeUsage(false);
   }
+
+  // Watched on the raw reading: the failure path below swaps it for the last good value, and
+  // with it whatever the endpoint said.
+  announceRateLimit(rateLimitWatch.observe(usage));
 
   // A timed-out / unparseable fetch comes back as success:false with 0% — never
   // let that overwrite a good cached value (it would make the dashboard read 0%

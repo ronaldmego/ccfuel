@@ -65,7 +65,8 @@ why a reply without a weekly figure is reported as a failure instead of a `0%` r
 - 35-second timeout with graceful fallback, plus one retry inside the same collector cycle
 - **A failed/timed-out fetch keeps the last good cached value** — a transient PTY timeout never overwrites real usage with `0%` (see Historical bug below)
 - Failures are named, not generic: `failureKind` is one of `no-oauth-token`,
-  `oauth-unauthorized`, `endpoint-http-error`, `endpoint-timeout`, `endpoint-unreachable`,
+  `oauth-unauthorized`, `endpoint-rate-limited`, `endpoint-http-error`, `endpoint-timeout`,
+  `endpoint-unreachable`,
   `cache-stale`, `cache-absent`, `cache-unreadable`, `trust-prompt`, `login-required`,
   `timeout`, `exited-early`. The first two are detected during boot and end the fetch
   immediately instead of spending the full 35 s on a state no retry can clear.

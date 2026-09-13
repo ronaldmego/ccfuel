@@ -182,6 +182,8 @@ node --env-file=.env server.js
 | `DASHBOARD_USAGE_SOURCE` | `auto` | Where the gauge comes from: `auto` (endpoint → cache → PTY) or one pinned source — `endpoint`, `cache`, `pty` |
 | `DASHBOARD_USAGE_CACHE_MAX_AGE_MIN` | `30` | How old Claude Code's cached usage may be before the `cache` source refuses to serve it as live |
 | `DASHBOARD_CLAUDE_CWD` | *(inherit)* | Folder to spawn `claude` in. Set it to a folder Claude Code already trusts |
+| `DASHBOARD_NOTIFY_CMD` | *(off)* | Command run when the usage endpoint enters or leaves a rate-limit episode. It gets one JSON object on stdin: `event` (`rate-limit-start` / `rate-limit-end`), `startedAt` and `host`, plus `retryAfterSec` and `servedBy` on a start, `lastLimitedAt`, `endedAt` and `affectedReads` on an end. ccfuel never learns the channel; a failing hook only costs a log line. Episodes are logged whether or not it is set |
+| `DASHBOARD_NOTIFY_COOLDOWN_MIN` | `60` | How long the endpoint must answer without a `429` before an episode is declared over — so an endpoint that flaps is one episode, not a stream of alerts |
 | `DASHBOARD_SESSION_SCAN_INTERVAL_MIN` | `30` | Transcript scan cadence in minutes. `0` disables the "What burned it" panel |
 | `DASHBOARD_SESSION_MIN_FUEL` | `10000` | Sessions under this many fuel tokens are treated as noise |
 | `DASHBOARD_TRANSCRIPTS_ROOT` | `~/.claude/projects` | Where session transcripts live |
@@ -353,7 +355,7 @@ reaps the child tree with it.
 | Risk | Detail |
 |------|--------|
 | Unreadable token | No `~/.claude/.credentials.json` and a locked Keychain give `failureKind: no-oauth-token`; a rotated or expired one gives `oauth-unauthorized`. Both fall through to the next source |
-| Rate limit | The endpoint throttles per account, and that budget is shared with every Claude Code session on it. A `429` (with `Retry-After`) comes back as `endpoint-http-error`, and the chain falls through to the cache and then to the PTY |
+| Rate limit | The endpoint throttles per account, and that budget is shared with every Claude Code session on it. A `429` comes back as `endpoint-rate-limited` (with `retryAfterSec` when the header is there), and the chain falls through to the cache and then to the PTY. `DASHBOARD_NOTIFY_CMD` can tell you when an episode starts and ends |
 | Sub-second jitter in `resets_at` | The API returns the reset with microsecond precision, either side of the minute (`05:00:00.287Z`, then `04:59:59.993Z`). At a negative offset the second one is 23:59 of the previous day, which would flip the label, the hour and the cycle range between two reads of the same window. The mapper snaps the instant to the nearest minute ([#59](https://github.com/ronaldmego/ccfuel/issues/59)) |
 | Endpoint shape changes | The mapper reads `five_hour`, `seven_day`, `seven_day_sonnet` and `extra_usage`. A reply without a weekly figure is reported as a failure, never as a `0%` reading |
 | Stale cache | Claude Code's cached copy is only as fresh as the last session that read `/usage` — booting `claude` does not refresh it. Anything older than `DASHBOARD_USAGE_CACHE_MAX_AGE_MIN` is refused rather than served as if it were live |

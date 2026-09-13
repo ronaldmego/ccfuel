@@ -126,6 +126,18 @@ function mapUtilization(payload, { tzOffset, now = Date.now(), source = 'endpoin
   };
 }
 
+/**
+ * Seconds to wait, from a Retry-After header: delta-seconds or an HTTP date. Null when the
+ * header is absent or unreadable — the 429 is reported either way.
+ */
+function parseRetryAfter(value, now = Date.now()) {
+  if (value == null || value === '') return null;
+  const s = String(value).trim();
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  const at = Date.parse(s);
+  return Number.isNaN(at) ? null : Math.max(0, Math.round((at - now) / 1000));
+}
+
 function failure(kind, message, source) {
   return {
     success: false,
@@ -168,6 +180,19 @@ async function fetchUsageFromEndpoint({
       signal: controller.signal
     });
     if (!res.ok) {
+      // Throttled, not broken: the limit is per account, and every Claude Code session on it
+      // draws from the same budget. Named on its own so it is not mistaken for a real HTTP
+      // failure, and so an operator can be told when an episode starts (#66).
+      if (res.status === 429) {
+        const retryAfterSec = parseRetryAfter(res.headers.get('retry-after'));
+        return {
+          ...failure('endpoint-rate-limited',
+            `${url} answered HTTP 429 (rate limited`
+            + (retryAfterSec != null ? `; retry after ${retryAfterSec} s).` : ').'),
+            'endpoint'),
+          retryAfterSec
+        };
+      }
       const expired = creds.expiresAt != null && creds.expiresAt < Date.now();
       return failure(res.status === 401 ? 'oauth-unauthorized' : 'endpoint-http-error',
         `${url} answered HTTP ${res.status}`
@@ -230,6 +255,7 @@ function readCachedUtilization({
 module.exports = {
   mapUtilization,
   snapToMinute,
+  parseRetryAfter,
   fetchUsageFromEndpoint,
   readCachedUtilization,
   readOAuthToken,

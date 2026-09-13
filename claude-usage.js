@@ -419,43 +419,60 @@ const SOURCE_ORDER = {
   pty: ['pty']
 };
 
+const DEFAULT_READERS = {
+  endpoint: ({ tzOffset }) => fetchUsageFromEndpoint({ tzOffset }),
+  cache: ({ tzOffset }) => readCachedUtilization({ tzOffset }),
+  pty: ({ debug, tzOffset }) => getUsageViaPty(debug, { tzOffset })
+};
+
 /**
  * The plan gauge, from the cheapest source that can answer.
  *
  * Returns the same shape on every path, plus `source` naming the one that produced it. On
  * total failure the last error is returned with `triedSources` listing what each one said,
  * so a dead gauge names its cause instead of just timing out.
+ *
+ * Whenever an earlier source did not answer, the result also carries `fallbackFrom`: what
+ * each of them said, structured. A PTY read behind a rate-limited endpoint is a success for
+ * the gauge and a signal for the operator, and until #66 that second half was a log line.
  */
 async function getClaudeUsage(debug = false, {
   tzOffset = DEFAULT_TZ_OFFSET,
-  source = process.env.DASHBOARD_USAGE_SOURCE || 'auto'
+  source = process.env.DASHBOARD_USAGE_SOURCE || 'auto',
+  readers = DEFAULT_READERS   // injectable so the tests can drive the chain without an account
 } = {}) {
   const key = String(source).toLowerCase();
   const order = SOURCE_ORDER[key];
   if (!order) {
     console.warn(`[ccfuel] Unknown DASHBOARD_USAGE_SOURCE "${source}" — using auto `
       + `(${Object.keys(SOURCE_ORDER).join(', ')}).`);
-    return getClaudeUsage(debug, { tzOffset, source: 'auto' });
+    return getClaudeUsage(debug, { tzOffset, source: 'auto', readers });
   }
 
   const tried = [];
+  const fallbackFrom = [];
   let result = null;
   for (const candidate of order) {
-    if (candidate === 'endpoint') result = await fetchUsageFromEndpoint({ tzOffset });
-    else if (candidate === 'cache') result = readCachedUtilization({ tzOffset });
-    else result = await getUsageViaPty(debug, { tzOffset });
+    result = await readers[candidate]({ debug, tzOffset });
 
     if (result.success) {
       if (tried.length) {
         console.warn(`[ccfuel] usage read from ${candidate} after ${tried.join(' | ')}`);
+        result.fallbackFrom = fallbackFrom;
       }
       return result;
     }
     tried.push(`${candidate}: ${result.failureKind || 'failed'}`);
+    fallbackFrom.push({
+      source: candidate,
+      failureKind: result.failureKind || 'failed',
+      ...(result.retryAfterSec != null ? { retryAfterSec: result.retryAfterSec } : {})
+    });
   }
 
-  return { ...result, triedSources: tried, errorMessage: `${result.errorMessage || 'usage read failed'}`
-    + (tried.length > 1 ? ` (tried ${tried.join(' | ')})` : '') };
+  return { ...result, triedSources: tried, fallbackFrom,
+    errorMessage: `${result.errorMessage || 'usage read failed'}`
+      + (tried.length > 1 ? ` (tried ${tried.join(' | ')})` : '') };
 }
 
 module.exports = {
