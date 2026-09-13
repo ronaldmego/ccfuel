@@ -39,6 +39,12 @@ why a reply without a weekly figure is reported as a failure instead of a `0%` r
   ([#55](https://github.com/ronaldmego/ccfuel/issues/55)). The line is now cleared before
   every attempt and Enter is refused on anything but a bare `/usage`, but the class of risk
   is inherent to driving a TUI — which is why this path is no longer the default.
+- **It is a real interactive session, with everything that implies.** Where Claude Code starts
+  interactive sessions under Remote Control, the spawn registered as one and showed up in the
+  user's Claude apps as a remote session every time the chain fell through to it — in
+  practice, whenever the endpoint answered `429` or `401` while the cached copy was stale
+  ([#61](https://github.com/ronaldmego/ccfuel/issues/61)). It now boots with
+  `remoteControlAtStartup: false`, which overrides that default for this process only.
 - **One at a time:** Cannot run multiple PTY sessions simultaneously (Claude detects and rejects).
 - **Env-sensitive:** all `CLAUDE*` env vars must be filtered or Claude refuses to start
   (nested-session detection).

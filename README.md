@@ -327,7 +327,11 @@ schedule; an expired one just fails over to the next source.
 **The PTY path**, when it runs, spawns with no MCP servers (`--strict-mcp-config` plus an
 empty `--mcp-config`): the session types a slash command and never calls a tool, but a
 default spawn boots every MCP server the user has configured — on a host with Playwright MCP
-that was a second process of ~162 MB per fetch, for nothing. It clears the input line before
+that was a second process of ~162 MB per fetch, for nothing. It also spawns with Remote
+Control off (`--settings '{"remoteControlAtStartup":false}'`): where Claude Code starts every
+interactive session under Remote Control, each fallback fetch otherwise showed up in the
+user's Claude apps as a new remote session
+([#61](https://github.com/ronaldmego/ccfuel/issues/61)). It clears the input line before
 every keystroke attempt and refuses to press Enter on anything but a bare `/usage`; see the
 history below for what that guard is made of.
 
@@ -337,7 +341,7 @@ history below for what that guard is made of.
 |---|---|---|
 | wall time | ~0.7 s | ~6 s happy path, 35 s hard timeout |
 | processes | none | one `claude`, ~327 MB RSS, ~9.7 s CPU |
-| sessions | none | one Claude Code session per fetch |
+| sessions | none | one local Claude Code session per fetch, never registered with Remote Control |
 | model calls | none — the request asks the account for its own figures | none, as long as nothing but `/usage` reaches the prompt |
 
 PTY figures measured on a 12-core VPS with the collector at its default 20-minute interval.
@@ -349,6 +353,7 @@ reaps the child tree with it.
 | Risk | Detail |
 |------|--------|
 | Unreadable token | No `~/.claude/.credentials.json` and a locked Keychain give `failureKind: no-oauth-token`; a rotated or expired one gives `oauth-unauthorized`. Both fall through to the next source |
+| Rate limit | The endpoint throttles per account, and that budget is shared with every Claude Code session on it. A `429` (with `Retry-After`) comes back as `endpoint-http-error`, and the chain falls through to the cache and then to the PTY |
 | Sub-second jitter in `resets_at` | The API returns the reset with microsecond precision, either side of the minute (`05:00:00.287Z`, then `04:59:59.993Z`). At a negative offset the second one is 23:59 of the previous day, which would flip the label, the hour and the cycle range between two reads of the same window. The mapper snaps the instant to the nearest minute ([#59](https://github.com/ronaldmego/ccfuel/issues/59)) |
 | Endpoint shape changes | The mapper reads `five_hour`, `seven_day`, `seven_day_sonnet` and `extra_usage`. A reply without a weekly figure is reported as a failure, never as a `0%` reading |
 | Stale cache | Claude Code's cached copy is only as fresh as the last session that read `/usage` — booting `claude` does not refresh it. Anything older than `DASHBOARD_USAGE_CACHE_MAX_AGE_MIN` is refused rather than served as if it were live |

@@ -12,7 +12,7 @@ const os = require('os');
 const path = require('path');
 
 const { mapUtilization, fetchUsageFromEndpoint, readCachedUtilization, snapToMinute } = require('../usage-source');
-const { isDoubledUsageInput } = require('../claude-usage');
+const { isDoubledUsageInput, PTY_CLAUDE_ARGS } = require('../claude-usage');
 
 const cases = [];
 const test = (name, fn) => cases.push([name, fn]);
@@ -222,6 +222,21 @@ test('a doubled line that has since been cleared no longer blocks the fetch', ()
 
 test('after a clear+retype the stale doubled text no longer counts', () =>
   isDoubledUsageInput('❯ /usage/usage \x1b[2K ❯ /usage') === false);
+
+// --- the flags the PTY fallback boots with (#61) -----------------------------------------
+
+/** The JSON that follows `flag` in the spawn args, parsed: structure, not string matching. */
+const flagJson = (flag) => {
+  const i = PTY_CLAUDE_ARGS.indexOf(flag);
+  return i >= 0 ? JSON.parse(PTY_CLAUDE_ARGS[i + 1]) : undefined;
+};
+
+test('the PTY spawn never registers as a Remote Control session', () =>
+  flagJson('--settings')?.remoteControlAtStartup === false);
+
+test('the PTY spawn boots no MCP servers', () =>
+  PTY_CLAUDE_ARGS.includes('--strict-mcp-config')
+  && Object.keys(flagJson('--mcp-config')?.mcpServers ?? { missing: true }).length === 0);
 
 // --- run --------------------------------------------------------------------------------
 
